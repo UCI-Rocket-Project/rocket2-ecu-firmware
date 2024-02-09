@@ -25,6 +25,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <cstring>
+#include "tc_max31855_spi.h"
 
 /* USER CODE END Includes */
 
@@ -75,6 +76,7 @@ static void MX_SPI2_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+  TcMax31855Spi tc0 = TcMax31855Spi(&hspi1, NCS_1_GPIO_Port, NCS_1_Pin);
 
   /* USER CODE END 1 */
 
@@ -112,8 +114,13 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-    char buf[100] = {'a'};
-	  CDC_Transmit_FS((uint8_t*)buf, 8);
+    TcMax31855Spi::Data tc0data = tc0.Read();
+    char buf[100] = {0};
+
+    if (tc0data.valid) {
+      sprintf(buf, "%6.2f\r\n", tc0data.tcTemperature);
+      CDC_Transmit_FS((uint8_t*)buf, 8);
+    }
 
 	  HAL_Delay(100);
     /* USER CODE BEGIN 3 */
