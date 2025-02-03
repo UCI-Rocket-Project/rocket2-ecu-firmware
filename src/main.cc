@@ -22,6 +22,9 @@
 
 #include <cmath>
 
+#include "usb_device.h"
+#include "usbd_cdc_if.h"
+
 #include "crc.h"
 
 using namespace std; 
@@ -131,7 +134,6 @@ int main(void){
   MX_ADC3_Init();
   MX_TIM1_Init();
   MX_ADC2_Init();
-
   solenoidState0 = 0;
   solenoidState1 = 0;
   solenoidState2 = 0;
@@ -208,8 +210,8 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 16;
-  RCC_OscInitStruct.PLL.PLLN = 336;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 7;
   RCC_OscInitStruct.PLL.PLLR = 2;
