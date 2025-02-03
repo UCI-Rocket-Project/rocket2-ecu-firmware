@@ -177,14 +177,28 @@ int main(void){
       *(((uint32_t *)&rawData) + i) += data;
     }
 
-    data.solenoidCurrentStateVent = 0.000817f * (float)rawData.s0;
+    data.solenoidCurrentStateCoPvVent = 0.000817f * (float)rawData.s0;
     data.solenoidCurrentStatePv1 = 0.000817f * (float)rawData.s1;
     data.solenoidCurrentStatePv2 = 0.000817f * (float)rawData.s2;
     data.solenoidCurrentStateVent = 0.000817f * (float)rawData.s3;
 
     // USB
     char buffer[1024] = {0};
-    sprintf(buffer, "Timestamp: %08X\r\n", (unsigned int)data.timestamp);
+    sprintf(buffer, 
+            "Timestamp: %08X\r\n"
+            "(1)CoPV Vent: %d-%04d   (2)PV1: %d-%04d  (3)PV2: %d-%04d  (4)Vent: %d-%04d\r\n"
+            "---------------------\r\n", 
+            (unsigned int)(data.timestamp), 
+            (int)(data.solenoidInternalStateCoPvVent), (int)(data.solenoidCurrentStateCoPvVent * 1000),
+            (int)(data.solenoidInternalStatePv1), (int)(data.solenoidCurrentStatePv1 * 1000),
+            (int)(data.solenoidInternalStatePv2), (int)(data.solenoidCurrentStatePv2 * 1000),
+            (int)(data.solenoidCurrentStateVent), (int)(data.solenoidInternalStateVent * 1000));
+    CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
+
+    // ethernet
+    uint32_t crc = Crc32((uint8_t *)&data, sizeof(EcuData) - 4);
+    data.crc = crc;
+    HAL_UART_Transmit(&huart3, (uint8_t *)&data, sizeof(EcuData), 100);
 
   }
 }
