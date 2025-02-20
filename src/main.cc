@@ -18,12 +18,13 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stdio.h"
+#include <stdio.h>
 
 #include <cmath>
 
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
+#include "tc_max31855_spi.h"
 
 #include "crc.h"
 
@@ -35,9 +36,17 @@ struct AdcData {
   uint32_t s1; 
   uint32_t s2; 
   uint32_t s3; 
+  uint32_t pt0; 
+  uint32_t pt1; 
+  uint32_t pt2; 
+  uint32_t pt3; 
+  uint32_t pt4; 
+  uint32_t pt5; // extra unused
+  uint32_t pt6; // extra unused
 };
 
 struct EcuCommand {
+  bool alarm; 
   bool solenoidStatePv1;
   bool solenoidStatePv2;
   bool solenoidStateVent;
@@ -55,6 +64,12 @@ struct EcuData {
   float solenoidCurrentStatePv2 = nanf("");
   float solenoidCurrentStateVent = nanf("");
   float solenoidCurrentStateCoPvVent = nanf("");
+  float pressureCoPV = nanf("");
+  float pressureLox = nanf("");
+  float pressureLoxInj = nanf("");
+  float pressureLng = nanf("");
+  float pressureLngInj = nanf("");
+  float temperatureCoPV = nanf("");
   uint32_t crc; 
 };
 
@@ -86,7 +101,11 @@ int solenoidState1;
 int solenoidState2;
 int solenoidState3;
 
-// alarm
+// TC handlers 
+TcMax31855Spi tc0(&hspi3, TC0_nCS_GPIO_Port, TC0_nCS_Pin, 100);
+TcMax31855Spi tc1(&hspi3, TC1_nCS_GPIO_Port, TC1_nCS_Pin, 100);
+
+// alarm- piezo buzzer 
 int alarmState; 
 
 // incoming command
@@ -134,10 +153,22 @@ int main(void){
   MX_ADC3_Init();
   MX_TIM1_Init();
   MX_ADC2_Init();
+
+  HAL_GPIO_WritePin(ETH_nRST_GPIO_Port, ETH_nRST_Pin, GPIO_PIN_SET);
+
+  HAL_GPIO_WritePin(TC0_nCS_GPIO_Port, TC0_nCS_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(TC1_nCS_GPIO_Port, TC1_nCS_Pin, GPIO_PIN_SET);
+
   solenoidState0 = 0;
   solenoidState1 = 0;
   solenoidState2 = 0;
   solenoidState3 = 0;
+
+  alarmState = 0; 
+  
+  HAL_Delay(1000);
+
+  HAL_UART_Receive_IT(&huart3, commandBuffer, sizeof(EcuCommand));
 
   while (1){
     EcuData data; 
@@ -168,6 +199,9 @@ int main(void){
     HAL_GPIO_WritePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin, (GPIO_PinState)solenoidState2);
     HAL_GPIO_WritePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin, (GPIO_PinState)solenoidState3);
 
+    // alarm- piezo buzzer
+    HAL_GPIO_WritePin(ALARM_GPIO_Port, ALARM_Pin, (GPIO_PinState)alarmState);
+
     // ADC operations
     AdcData rawData = {0};
     for (int i = 0; i < 16; i++) {
@@ -176,7 +210,27 @@ int main(void){
       uint32_t data = HAL_ADC_GetValue(&hadc1);
       *(((uint32_t *)&rawData) + i) += data;
     }
+    // pressure data 
+    data.pressureCoPV = 0.00128 * (float)rawData.pt0;
+    data.pressureLng = 0.00128 * (float)rawData.pt1;
+    data.pressureLngInj = 0.00128 * (float)rawData.pt2;
+    data.pressureLox = 0.00128 * (float)rawData.pt3;
+    data.pressureLoxInj = 0.00128 * (float)rawData.pt4;
+    (void)(0.00128f * (float)rawData.pt5); // extra PT
+    (void)(0.00128f * (float)rawData.pt6); // extra PT
 
+    // read TC
+    TcMax31855Spi:: Data tcData; 
+    tcData = tc0.Read(); 
+    if (tcData.valid){
+      data.temperatureCoPV = tcData.tcTemperature;
+    }
+    tcData = tc1.Read(); 
+    if (tcData.valid){
+      data.temperatureCoPV = tcData.tcTemperature;
+    }
+
+    // solenoid
     data.solenoidCurrentStateCoPvVent = 0.000817f * (float)rawData.s0;
     data.solenoidCurrentStatePv1 = 0.000817f * (float)rawData.s1;
     data.solenoidCurrentStatePv2 = 0.000817f * (float)rawData.s2;
@@ -187,12 +241,20 @@ int main(void){
     sprintf(buffer, 
             "Timestamp: %08X\r\n"
             "(1)CoPV Vent: %d-%04d   (2)PV1: %d-%04d  (3)PV2: %d-%04d  (4)Vent: %d-%04d\r\n"
+            "PRESSURE\r\n"
+            "CoPV Pressure: %04d  LNG Pressure: %04d  LNG INJ Pressure: %04d  LOX Pressure: %04d  LOX INJ Pressure: %04d\r\n"
+            "TEMPERATURE\r\n"
+            "CoPV Temperature: %03d"
             "---------------------\r\n", 
             (unsigned int)(data.timestamp), 
             (int)(data.solenoidInternalStateCoPvVent), (int)(data.solenoidCurrentStateCoPvVent * 1000),
             (int)(data.solenoidInternalStatePv1), (int)(data.solenoidCurrentStatePv1 * 1000),
             (int)(data.solenoidInternalStatePv2), (int)(data.solenoidCurrentStatePv2 * 1000),
-            (int)(data.solenoidCurrentStateVent), (int)(data.solenoidInternalStateVent * 1000));
+            (int)(data.solenoidCurrentStateVent), (int)(data.solenoidInternalStateVent * 1000),
+            (int)(data.pressureCoPV * 1000),
+            (int)(data.pressureLng * 1000), (int)(data.pressureLngInj * 1000),
+            (int)(data.pressureLox * 1000), (int)(data.pressureLoxInj * 1000),
+            (int)(data.temperatureCoPV));
     CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
 
     // ethernet
