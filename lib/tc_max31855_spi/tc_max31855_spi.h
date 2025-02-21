@@ -4,8 +4,9 @@
 #include "stm32f4xx_hal.h"
 #elif defined(disco_f469ni)
 #include "stm32f4xx_hal.h"
-#endif
+#elif defined(STM32F4)
 #include <stm32f4xx_hal.h>
+#endif
 
 class TcMax31855Spi {
   public:

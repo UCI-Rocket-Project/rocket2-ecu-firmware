@@ -115,8 +115,8 @@ void Error_Handler(void);
 #define PT5_GPIO_Port GPIOA
 #define GPS_INT_Pin GPIO_PIN_2
 #define GPS_INT_GPIO_Port GPIOH
-#define MEM_nCS_Pin GPIO_PIN_3
-#define MEM_nCS_GPIO_Port GPIOH
+#define MEM2_nCS_Pin GPIO_PIN_3
+#define MEM2_nCS_GPIO_Port GPIOH
 #define GPS_SCL_Pin GPIO_PIN_4
 #define GPS_SCL_GPIO_Port GPIOH
 #define GPS_SDA_Pin GPIO_PIN_5

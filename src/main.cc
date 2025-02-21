@@ -24,6 +24,12 @@
 
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
+
+#include "altimeter_ms5607_spi.h"
+// #include "gps_ubxm8_i2c.h"
+#include "imu_bmi088_spi.h"
+#include "magnetometer_bmi150_i2c.h"
+#include "memory_w25q1128jv_spi.h"
 #include "tc_max31855_spi.h"
 
 #include "crc.h"
@@ -55,22 +61,45 @@ struct EcuCommand {
 };
 
 struct EcuData {
-  uint32_t timestamp; 
+  uint32_t timestamp;
+  float packetRssi;
+  float packetLoss;
+  bool solenoidInternalStateCopvVent;
   bool solenoidInternalStatePv1;
   bool solenoidInternalStatePv2;
   bool solenoidInternalStateVent;
-  bool solenoidInternalStateCoPvVent;
-  float solenoidCurrentStatePv1 = nanf("");
-  float solenoidCurrentStatePv2 = nanf("");
-  float solenoidCurrentStateVent = nanf("");
-  float solenoidCurrentStateCoPvVent = nanf("");
-  float pressureCoPV = nanf("");
-  float pressureLox = nanf("");
-  float pressureLoxInj = nanf("");
-  float pressureLng = nanf("");
-  float pressureLngInj = nanf("");
-  float temperatureCoPV = nanf("");
-  uint32_t crc; 
+  float supplyVoltage = std::nanf("");
+  float batteryVoltage = std::nanf("");
+  float solenoidCurrentCopvVent = std::nanf("");
+  float solenoidCurrentPv1 = std::nanf("");
+  float solenoidCurrentPv2 = std::nanf("");
+  float solenoidCurrentVent = std::nanf("");
+  float temperatureCopv = std::nanf("");
+  float pressureCopv = std::nanf("");
+  float pressureLox = std::nanf("");
+  float pressureLng = std::nanf("");
+  float pressureInjectorLox = std::nanf("");
+  float pressureInjectorLng = std::nanf("");
+  float angularVelocityX = std::nanf("");
+  float angularVelocityY = std::nanf("");
+  float angularVelocityZ = std::nanf("");
+  float accelerationX = std::nanf("");
+  float accelerationY = std::nanf("");
+  float accelerationZ = std::nanf("");
+  float magneticFieldX = std::nanf("");
+  float magneticFieldY = std::nanf("");
+  float magneticFieldZ = std::nanf("");
+  float temperature = std::nanf("");
+  float altitude = std::nanf("");
+  float ecefPositionX = std::nanf("");
+  float ecefPositionY = std::nanf("");
+  float ecefPositionZ = std::nanf("");
+  float ecefPositionAccuracy = std::nanf("");
+  float ecefVelocityX = std::nanf("");
+  float ecefVelocityY = std::nanf("");
+  float ecefVelocityZ = std::nanf("");
+  float ecefVelocityAccuracy = std::nanf("");
+  uint32_t crc;
 };
 
 #pragma pack(pop)
@@ -104,6 +133,18 @@ int solenoidState3;
 // TC handlers 
 TcMax31855Spi tc0(&hspi3, TC0_nCS_GPIO_Port, TC0_nCS_Pin, 100);
 TcMax31855Spi tc1(&hspi3, TC1_nCS_GPIO_Port, TC1_nCS_Pin, 100);
+
+/* Flight sensor init */
+MemoryW25q1128jvSpi memory1(&hspi1, MEM1_nCS_GPIO_Port, MEM1_nCS_Pin);
+MemoryW25q1128jvSpi memory2(&hspi1, MEM2_nCS_GPIO_Port, MEM2_nCS_Pin);
+
+AltimeterMs5607Spi altimeter(&hspi4, ALT_nCS_GPIO_Port, ALT_nCS_Pin, ALT_MISO_GPIO_Port, ALT_MISO_Pin, 1014.9, 100);
+
+/////////////////////////////////////////// DO GPS LATER
+
+ImuBmi088Spi imu(&hspi1, IMU_nCS1_GPIO_Port, IMU_nCS1_Pin, IMU_nCS2_GPIO_Port, IMU_nCS2_Pin);
+
+MagBmi150i2c magnetometer(&hi2c1, MAG_INT_GPIO_Port, MAG_INT_Pin, MAG_DRDY_GPIO_Port, MAG_DRDY_Pin);
 
 // alarm- piezo buzzer 
 int alarmState; 
@@ -154,6 +195,18 @@ int main(void){
   MX_TIM1_Init();
   MX_ADC2_Init();
 
+  // Init data packages
+  EcuData data;
+
+  AltimeterMs5607Spi::Data altData;
+  AltimeterMs5607Spi::State altState;
+
+  //////////////////////////////////////  // GPS data package
+
+  ImuBmi088Spi::Data imuData;
+
+  MagBmi150i2c::Data magData;
+
   HAL_GPIO_WritePin(ETH_nRST_GPIO_Port, ETH_nRST_Pin, GPIO_PIN_SET);
 
   HAL_GPIO_WritePin(TC0_nCS_GPIO_Port, TC0_nCS_Pin, GPIO_PIN_SET);
@@ -166,15 +219,20 @@ int main(void){
 
   alarmState = 0; 
   
-  HAL_Delay(1000);
-
   HAL_UART_Receive_IT(&huart3, commandBuffer, sizeof(EcuCommand));
 
-  while (1){
-    EcuData data; 
+  // Init all of the sensors
+  memory1.Init();
+  memory2.Init();
+  altimeter.Init();
+  imu.Init();
+  magnetometer.Init();
 
+  HAL_Delay(100); // just like wait until all the sensors are all initialised
+
+  while (1){
     /*Double check if this is correct*/
-    uint32_t timestamp = HAL_GetTick(); 
+    uint32_t timestamp = HAL_GetTick(); // replace later with timers 
     data.timestamp = timestamp;
 
     // updating internal states
@@ -188,7 +246,7 @@ int main(void){
     }
 
     // internal states feedback
-    data.solenoidInternalStateCoPvVent = (bool)solenoidState0;
+    data.solenoidInternalStateCopvVent = (bool)solenoidState0;
     data.solenoidInternalStatePv1 = (bool)solenoidState1;
     data.solenoidInternalStatePv2 = (bool)solenoidState2;
     data.solenoidInternalStateVent = (bool)solenoidState3;
@@ -211,11 +269,11 @@ int main(void){
       *(((uint32_t *)&rawData) + i) += data;
     }
     // pressure data 
-    data.pressureCoPV = 0.00128 * (float)rawData.pt0;
+    data.pressureCopv = 0.00128 * (float)rawData.pt0;
     data.pressureLng = 0.00128 * (float)rawData.pt1;
-    data.pressureLngInj = 0.00128 * (float)rawData.pt2;
+    data.pressureInjectorLng = 0.00128 * (float)rawData.pt2;
     data.pressureLox = 0.00128 * (float)rawData.pt3;
-    data.pressureLoxInj = 0.00128 * (float)rawData.pt4;
+    data.pressureInjectorLox = 0.00128 * (float)rawData.pt4;
     (void)(0.00128f * (float)rawData.pt5); // extra PT
     (void)(0.00128f * (float)rawData.pt6); // extra PT
 
@@ -223,18 +281,18 @@ int main(void){
     TcMax31855Spi:: Data tcData; 
     tcData = tc0.Read(); 
     if (tcData.valid){
-      data.temperatureCoPV = tcData.tcTemperature;
+      data.temperatureCopv = tcData.tcTemperature;
     }
     tcData = tc1.Read(); 
     if (tcData.valid){
-      data.temperatureCoPV = tcData.tcTemperature;
+      data.temperatureCopv = tcData.tcTemperature;
     }
 
     // solenoid
-    data.solenoidCurrentStateCoPvVent = 0.000817f * (float)rawData.s0;
-    data.solenoidCurrentStatePv1 = 0.000817f * (float)rawData.s1;
-    data.solenoidCurrentStatePv2 = 0.000817f * (float)rawData.s2;
-    data.solenoidCurrentStateVent = 0.000817f * (float)rawData.s3;
+    data.solenoidCurrentCopvVent = 0.000817f * (float)rawData.s0;
+    data.solenoidCurrentPv1 = 0.000817f * (float)rawData.s1;
+    data.solenoidCurrentPv2 = 0.000817f * (float)rawData.s2;
+    data.solenoidCurrentVent = 0.000817f * (float)rawData.s3;
 
     // USB
     char buffer[1024] = {0};
@@ -247,21 +305,46 @@ int main(void){
             "CoPV Temperature: %03d"
             "---------------------\r\n", 
             (unsigned int)(data.timestamp), 
-            (int)(data.solenoidInternalStateCoPvVent), (int)(data.solenoidCurrentStateCoPvVent * 1000),
-            (int)(data.solenoidInternalStatePv1), (int)(data.solenoidCurrentStatePv1 * 1000),
-            (int)(data.solenoidInternalStatePv2), (int)(data.solenoidCurrentStatePv2 * 1000),
-            (int)(data.solenoidCurrentStateVent), (int)(data.solenoidInternalStateVent * 1000),
-            (int)(data.pressureCoPV * 1000),
-            (int)(data.pressureLng * 1000), (int)(data.pressureLngInj * 1000),
-            (int)(data.pressureLox * 1000), (int)(data.pressureLoxInj * 1000),
-            (int)(data.temperatureCoPV));
+            (int)(data.solenoidInternalStateCopvVent), (int)(data.solenoidCurrentCopvVent * 1000),
+            (int)(data.solenoidInternalStatePv1), (int)(data.solenoidCurrentPv1 * 1000),
+            (int)(data.solenoidInternalStatePv2), (int)(data.solenoidCurrentPv2 * 1000),
+            (int)(data.solenoidCurrentVent), (int)(data.solenoidInternalStateVent * 1000),
+            (int)(data.pressureCopv * 1000),
+            (int)(data.pressureLng * 1000), (int)(data.pressureInjectorLng * 1000),
+            (int)(data.pressureLox * 1000), (int)(data.pressureInjectorLox * 1000),
+            (int)(data.temperatureCopv));
     CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
 
     // ethernet
     uint32_t crc = Crc32((uint8_t *)&data, sizeof(EcuData) - 4);
     data.crc = crc;
     HAL_UART_Transmit(&huart3, (uint8_t *)&data, sizeof(EcuData), 100);
+    
+    /* Altimeter data */
+    altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
+    if (altState == AltimeterMs5607Spi::State::COMPLETE) {
+        altData = altimeter.GetData();
+        data.temperature = altData.temperature;
+        data.altitude = altData.altitude;
+    }
 
+    /* GPS data */
+
+    /* IMU data */
+    imuData = imu.Read();
+    data.angularVelocityX = -imuData.angularVelocityX;
+    data.angularVelocityY = imuData.angularVelocityY;
+    data.angularVelocityZ = -imuData.angularVelocityZ;
+    data.accelerationX = -imuData.accelerationX;
+    data.accelerationY = imuData.accelerationY;
+    data.accelerationZ = -imuData.accelerationZ;
+
+    /* Magnetometer data */
+    magData = magnetometer.Read();
+    data.magneticFieldX = magData.magneticFieldY;
+    data.magneticFieldY = -magData.magneticFieldX;
+    data.magneticFieldZ = magData.magneticFieldZ;
+    
   }
 }
 
@@ -935,7 +1018,7 @@ static void MX_GPIO_Init(void)
                           |SOLENOID1_EN_Pin|SOLENOID2_EN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOH, GPS_INT_Pin|MEM_nCS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOH, GPS_INT_Pin|MEM2_nCS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, SOLENOID3_EN_Pin|STATUS_LED_Pin|IMU_INT2_Pin|IMU_nCS2_Pin
@@ -988,7 +1071,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
   /*Configure GPIO pins : GPS_INT_Pin MEM_nCS_Pin */
-  GPIO_InitStruct.Pin = GPS_INT_Pin|MEM_nCS_Pin;
+  GPIO_InitStruct.Pin = GPS_INT_Pin|MEM2_nCS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
