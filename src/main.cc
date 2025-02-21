@@ -230,6 +230,14 @@ int main(void){
 
   HAL_Delay(100); // just like wait until all the sensors are all initialised
 
+  /* Buffer variables */
+
+  // Memory oscillates between writing between the 2 modules
+  // Counter for memory write
+  int memoryCounter = 0;
+
+  uint8_t memoryBuffer[64];
+
   while (1){
     /*Double check if this is correct*/
     uint32_t timestamp = HAL_GetTick(); // replace later with timers 
@@ -345,6 +353,46 @@ int main(void){
     data.magneticFieldY = -magData.magneticFieldX;
     data.magneticFieldZ = magData.magneticFieldZ;
     
+    /* Write to memory */
+    memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
+    if(memoryCounter % 2 == 0)
+    {
+      if (memory1.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
+        // reset the data from modules with lead time
+        data.temperature = 0xFFFF;
+        data.altitude = 0xFFFFFFFF;
+        data.ecefPositionX = 0xFFFFFFFF;
+        data.ecefPositionY = 0xFFFFFFFF;
+        data.ecefPositionZ = 0xFFFFFFFF;
+        data.ecefVelocityX = 0xFFFFFFFF;
+        data.ecefVelocityY = 0xFFFFFFFF;
+        data.ecefVelocityZ = 0xFFFFFFFF;
+        data.ecefPositionAccuracy = 0xFFFFFFFF;
+        data.ecefVelocityAccuracy = 0xFFFFFFFF;
+
+        // increment memory counter
+        memoryCounter++;
+      }
+    }
+    else
+    {
+      if (memory2.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
+        // reset the data from modules with lead time
+        data.temperature = 0xFFFF;
+        data.altitude = 0xFFFFFFFF;
+        data.ecefPositionX = 0xFFFFFFFF;
+        data.ecefPositionY = 0xFFFFFFFF;
+        data.ecefPositionZ = 0xFFFFFFFF;
+        data.ecefVelocityX = 0xFFFFFFFF;
+        data.ecefVelocityY = 0xFFFFFFFF;
+        data.ecefVelocityZ = 0xFFFFFFFF;
+        data.ecefPositionAccuracy = 0xFFFFFFFF;
+        data.ecefVelocityAccuracy = 0xFFFFFFFF;
+
+        // increment memory counter
+        memoryCounter++;
+      }
+    }
   }
 }
 
