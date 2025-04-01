@@ -34,6 +34,10 @@
 
 #include "crc.h"
 
+#define VREF 24.0             // reference voltage
+#define VFACTOR (15+100)/15   // Factor for voltage divider  
+#define ADC_MAX 4095.0        // 12-bit ADC resolution
+
 using namespace std; 
 
 #pragma(push, 1)
@@ -49,6 +53,8 @@ struct AdcData {
   uint32_t pt4; 
   uint32_t pt5; // extra unused
   uint32_t pt6; // extra unused
+  uint32_t supplyVoltage; 
+  uint32_t batteryVoltage; 
 };
 
 struct EcuCommand {
@@ -268,14 +274,29 @@ int main(void){
     // alarm- piezo buzzer
     HAL_GPIO_WritePin(ALARM_GPIO_Port, ALARM_Pin, (GPIO_PinState)alarmState);
 
-    // ADC operations
+    // ADC operations- sample averaging 
     AdcData rawData = {0};
     for (int i = 0; i < 16; i++) {
       HAL_ADC_Start(&hadc1);
+      HAL_ADC_Start(&hadc2);
+      HAL_ADC_Start(&hadc3); 
+
       HAL_ADC_PollForConversion(&hadc1, 10);
-      uint32_t data = HAL_ADC_GetValue(&hadc1);
-      *(((uint32_t *)&rawData) + i) += data;
+      HAL_ADC_PollForConversion(&hadc2, 10);
+      HAL_ADC_PollForConversion(&hadc3, 10);
+
+      uint32_t data1 = HAL_ADC_GetValue(&hadc1);
+      *(((uint32_t *)&rawData) + i) += data1;
+      uint32_t data2 = HAL_ADC_GetValue(&hadc2);
+      *(((uint32_t *)&rawData) + i) += data2;
+      uint32_t data3 = HAL_ADC_GetValue(&hadc3);
+      *(((uint32_t *)&rawData) + i) += data3;
     }
+
+    // battery voltages
+    data.batteryVoltage = 0.062f * (float)rawData.batteryVoltage + 0.435f; 
+    data.supplyVoltage = 0.062f * (float)rawData.supplyVoltage + 0.435f;  
+
     // pressure data 
     data.pressureCopv = 0.00128 * (float)rawData.pt0;
     data.pressureLng = 0.00128 * (float)rawData.pt1;
@@ -311,6 +332,8 @@ int main(void){
             "CoPV Pressure: %04d  LNG Pressure: %04d  LNG INJ Pressure: %04d  LOX Pressure: %04d  LOX INJ Pressure: %04d\r\n"
             "TEMPERATURE\r\n"
             "CoPV Temperature: %03d"
+            "BATTERY\r\n"
+            "ECU Battery: %04d  Supply Voltage: %04d"
             "---------------------\r\n", 
             (unsigned int)(data.timestamp), 
             (int)(data.solenoidInternalStateCopvVent), (int)(data.solenoidCurrentCopvVent * 1000),
@@ -320,7 +343,9 @@ int main(void){
             (int)(data.pressureCopv * 1000),
             (int)(data.pressureLng * 1000), (int)(data.pressureInjectorLng * 1000),
             (int)(data.pressureLox * 1000), (int)(data.pressureInjectorLox * 1000),
-            (int)(data.temperatureCopv));
+            (int)(data.temperatureCopv),
+            (int)(data.batteryVoltage), (int)(data.supplyVoltage)
+            );
     CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
 
     // ethernet
