@@ -32,6 +32,8 @@
 #include "memory_w25q1128jv_spi.h"
 #include "tc_max31855_spi.h"
 
+#include "radio_sx127x_spi.h"
+
 #include "crc.h"
 
 #define VREF 24.0             // reference voltage
@@ -108,6 +110,33 @@ struct EcuData {
   uint32_t crc;
 };
 
+struct ecuFluidSystemData {
+  uint8_t type = 0x11;
+  uint32_t timestamp = 0xFFFFFFFF;
+  uint16_t supplyVoltage = 0xFFFF;
+  uint16_t batteryVoltage = 0xFFFF;
+  uint64_t : 4;
+  bool solenoidStateCopvVent : 1;
+  bool solenoidStatePv1 : 1;
+  bool solenoidStatePv2 : 1;
+  bool solenoidStateVent : 1;
+  uint16_t solenoidCurrentCopvVent = 0xFFFF;
+  uint16_t solenoidCurrentPv1 = 0xFFFF;
+  uint16_t solenoidCurrentPv2 = 0xFFFF;
+  uint16_t solenoidCurrentVent = 0xFFFF;
+  int16_t temperatureCopv = 0xFFFF;
+  uint16_t pressureCopv = 0xFFFF;
+  uint16_t pressureLox = 0xFFFF;
+  uint16_t pressureLng = 0xFFFF;
+  uint16_t pressureInjectorLox = 0xFFFF;
+  uint16_t pressureInjectorLng = 0xFFFF;
+  uint64_t : 64;
+  uint64_t : 64;
+  uint64_t : 64;
+  uint64_t : 64;
+  uint16_t crc = 0x0000;
+};
+
 #pragma pack(pop)
 
 ADC_HandleTypeDef hadc1;
@@ -151,6 +180,24 @@ AltimeterMs5607Spi altimeter(&hspi4, ALT_nCS_GPIO_Port, ALT_nCS_Pin, ALT_MISO_GP
 ImuBmi088Spi imu(&hspi1, IMU_nCS1_GPIO_Port, IMU_nCS1_Pin, IMU_nCS2_GPIO_Port, IMU_nCS2_Pin);
 
 MagBmi150i2c magnetometer(&hi2c1, MAG_INT_GPIO_Port, MAG_INT_Pin, MAG_DRDY_GPIO_Port, MAG_DRDY_Pin);
+
+RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO_Port, 
+                      RADIO_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
+                      RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW250KHZ, 
+                      RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
+                      8, true, 500, 1023);
+
+RadioSx127xSpi radio1(&hspi5, RADIO1_nCS_GPIO_Port, RADIO1_nCS_Pin, RADIO1_nRST_GPIO_Port, 
+                      RADIO1_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
+                      RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW250KHZ, 
+                      RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
+                      8, true, 500, 1023);
+
+RadioSx127xSpi radio2(&hspi5, RADIO2_nCS_GPIO_Port, RADIO2_nCS_Pin, RADIO2_nRST_GPIO_Port, 
+                      RADIO2_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
+                      RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW250KHZ, 
+                      RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
+                      8, true, 500, 1023);
 
 // alarm- piezo buzzer 
 int alarmState; 
@@ -218,6 +265,9 @@ int main(void){
   HAL_GPIO_WritePin(TC0_nCS_GPIO_Port, TC0_nCS_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(TC1_nCS_GPIO_Port, TC1_nCS_Pin, GPIO_PIN_SET);
 
+  // TODO: Remove temp
+  HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin, GPIO_PIN_SET);
+
   solenoidState0 = 0;
   solenoidState1 = 0;
   solenoidState2 = 0;
@@ -225,7 +275,21 @@ int main(void){
 
   alarmState = 0; 
   
+  // ethernet recieve-- remove later once TRS receive is done 
   HAL_UART_Receive_IT(&huart3, commandBuffer, sizeof(EcuCommand));
+
+  // radio initialisation
+  if (!radio.Init())
+    radio.Reset();
+  if (!radio1.Init())
+    radio1.Reset(); 
+  if (!radio2.Init())
+    radio2.Reset();
+
+  // receive command from TRS
+  radio.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi); 
+  radio1.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi); 
+  radio2.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi); 
 
   // Init all of the sensors
   memory1.Init();
@@ -248,6 +312,32 @@ int main(void){
     /*Double check if this is correct*/
     uint32_t timestamp = HAL_GetTick(); // replace later with timers 
     data.timestamp = timestamp;
+
+    // read the command from TRS
+    // do one radio for now-- will write others later
+    // plan is to basically check if the radio can receive and if it cant then switch radios 
+    RadioSx127xSpi::State state = radio.Update(); // do one radio for now-- will write others later
+    if (state == RadioSx127xSpi::State::RX_COMPLETE){
+      // check CRC
+      uint32_t crc = command.crc; 
+      command.crc = 0; 
+      if (crc == Crc32((uint8_t *)&command, sizeof(EcuCommand) - 4)){
+        newCommand = true; 
+        alarmState = command.alarm; 
+
+      }
+    }
+    else if ((state == RadioSx127xSpi::State::IDLE) || 
+             (state == RadioSx127xSpi::State::RX_TIMEOUT)){
+      radio.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi);
+      // do nothing, just wait for the next command
+    }
+    else if (state == RadioSx127xSpi::State::ERROR){
+      // radio error, reset radio and reinit
+      radio.Reset();
+      radio.Init();
+      radio.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi);
+    }
 
     // updating internal states
     if (newCommand){

@@ -1,0 +1,44 @@
+{
+    "build": {
+      "core": "stm32",
+      "cpu": "cortex-m4",
+      "f_cpu": "180000000L",
+      "mcu": "stm32f469iit6",
+      "product_line": "STM32F4",
+      "variant": "STM32F4x9"
+    },
+    "connectivity": [
+      "ethernet",
+      "usb"
+    ],
+    "debug": {
+      "default_tool": "stlink",
+      "openocd_target": "stm32f4x",
+      "interface": "jtag",
+      "tools": {
+        "stlink": {
+          "onboard": true,
+          "server": {
+            "package": "tool-openocd",
+            "executable": "bin/openocd",
+            "arguments": [
+              "-f", "interface/stlink.cfg",
+              "-f", "target/stm32f4x.cfg"
+            ]
+          }
+        }
+      }
+    },
+    "frameworks": [
+      "stm32cube"
+    ],
+    "name": "Custom STM32F469IIT6 Board",
+    "upload": {
+      "maximum_ram_size": 393216,
+      "maximum_size": 2097152,
+      "protocol": "stlink"
+    },
+    "url": "https://example.com/custom-stm32f469-board",
+    "vendor": "MyCompany"
+  }
+  
