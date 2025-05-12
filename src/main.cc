@@ -291,6 +291,10 @@ int main(void){
   radio1.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi); 
   radio2.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi); 
 
+  // Array of radios for fallback
+  RadioSx127xSpi* radios[] = {&radio, &radio1, &radio2};
+  int currentRadioIndex = 0;
+
   // Init all of the sensors
   memory1.Init();
   memory2.Init();
@@ -316,7 +320,7 @@ int main(void){
     // read the command from TRS
     // do one radio for now-- will write others later
     // plan is to basically check if the radio can receive and if it cant then switch radios 
-    RadioSx127xSpi::State state = radio.Update(); // do one radio for now-- will write others later
+    RadioSx127xSpi::State state = radios[currentRadioIndex]->Update(); // do one radio for now-- will write others later
     if (state == RadioSx127xSpi::State::RX_COMPLETE){
       // check CRC
       uint32_t crc = command.crc; 
@@ -329,14 +333,19 @@ int main(void){
     }
     else if ((state == RadioSx127xSpi::State::IDLE) || 
              (state == RadioSx127xSpi::State::RX_TIMEOUT)){
-      radio.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi);
+      radios[currentRadioIndex]->Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi);
       // do nothing, just wait for the next command
     }
     else if (state == RadioSx127xSpi::State::ERROR){
       // radio error, reset radio and reinit
-      radio.Reset();
-      radio.Init();
-      radio.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi);
+      radios[currentRadioIndex]->Reset();
+      radios[currentRadioIndex]->Init();
+
+      // switch to the next radio in the array
+      currentRadioIndex = (currentRadioIndex + 1) % (sizeof(radios) / sizeof(radios[0]));
+
+      // start receiving on the next radio
+      radios[currentRadioIndex]->Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi);
     }
 
     // updating internal states
@@ -509,6 +518,15 @@ int main(void){
       }
     }
   }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+  uint32_t crc = Crc32(commandBuffer, sizeof(EcuCommand) - 4);
+  if (crc == ((EcuCommand *)commandBuffer)->crc) {
+      memcpy((uint8_t *)&command, commandBuffer, sizeof(EcuCommand));
+      newCommand = true;
+  }
+  HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));
 }
 
 /**
