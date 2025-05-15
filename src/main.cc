@@ -250,6 +250,7 @@ int main(void){
 
   // Init data packages
   EcuData data;
+  ecuFluidSystemData fluidSystemData;
 
   AltimeterMs5607Spi::Data altData;
   AltimeterMs5607Spi::State altState;
@@ -313,6 +314,8 @@ int main(void){
   uint8_t memoryBuffer[64];
 
   while (1){
+    HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+	  HAL_Delay(1000);    
     /*Double check if this is correct*/
     uint32_t timestamp = HAL_GetTick(); // replace later with timers 
     data.timestamp = timestamp;
@@ -450,7 +453,14 @@ int main(void){
     // ethernet
     uint32_t crc = Crc32((uint8_t *)&data, sizeof(EcuData) - 4);
     data.crc = crc;
-    HAL_UART_Transmit(&huart3, (uint8_t *)&data, sizeof(EcuData), 100);
+    // check if ethernet is connected
+    if (HAL_GPIO_ReadPin(ETH_nRST_GPIO_Port, ETH_nRST_Pin) == GPIO_PIN_SET) {
+      HAL_UART_Transmit(&huart3, (uint8_t *)&data, sizeof(EcuData), 100);
+    }
+    else {
+      // radio transmit :)
+    }
+
     
     /* Altimeter data */
     altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
