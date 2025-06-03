@@ -177,27 +177,27 @@ AltimeterMs5607Spi altimeter(&hspi4, ALT_nCS_GPIO_Port, ALT_nCS_Pin, ALT_MISO_GP
 
 /////////////////////////////////////////// DO GPS LATER
 
-ImuBmi088Spi imu(&hspi1, IMU_nCS1_GPIO_Port, IMU_nCS1_Pin, IMU_nCS2_GPIO_Port, IMU_nCS2_Pin);
+ImuBmi088Spi imu(&hspi6, IMU_nCS1_GPIO_Port, IMU_nCS1_Pin, IMU_nCS2_GPIO_Port, IMU_nCS2_Pin);
 
 MagBmi150i2c magnetometer(&hi2c1, MAG_INT_GPIO_Port, MAG_INT_Pin, MAG_DRDY_GPIO_Port, MAG_DRDY_Pin);
 
-RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO_Port, 
-                      RADIO_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
-                      RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW250KHZ, 
-                      RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
-                      8, true, 500, 1023);
-
-RadioSx127xSpi radio1(&hspi5, RADIO1_nCS_GPIO_Port, RADIO1_nCS_Pin, RADIO1_nRST_GPIO_Port, 
-                      RADIO1_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
-                      RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW250KHZ, 
-                      RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
-                      8, true, 500, 1023);
-
-RadioSx127xSpi radio2(&hspi5, RADIO2_nCS_GPIO_Port, RADIO2_nCS_Pin, RADIO2_nRST_GPIO_Port, 
+RadioSx127xSpi radio(&hspi5, RADIO2_nCS_GPIO_Port, RADIO2_nCS_Pin, RADIO2_nRST_GPIO_Port, 
                       RADIO2_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
-                      RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW250KHZ, 
+                      RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW125KHZ, 
                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
-                      8, true, 500, 1023);
+                      8, true, 1023, 1023);
+
+// RadioSx127xSpi radio1(&hspi5, RADIO1_nCS_GPIO_Port, RADIO1_nCS_Pin, RADIO1_nRST_GPIO_Port, 
+//                       RADIO1_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
+//                       RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW250KHZ, 
+//                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
+//                       8, true, 500, 1023);
+
+// RadioSx127xSpi radio2(&hspi5, RADIO2_nCS_GPIO_Port, RADIO2_nCS_Pin, RADIO2_nRST_GPIO_Port, 
+//                       RADIO2_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
+//                       RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW250KHZ, 
+//                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
+//                       8, true, 500, 1023);
 
 // alarm- piezo buzzer 
 int alarmState; 
@@ -209,7 +209,6 @@ EcuCommand command;
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_I2C2_Init(void);
@@ -233,7 +232,6 @@ int main(void){
   SystemClock_Config();
 
   MX_GPIO_Init();
-  MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
   MX_I2C1_Init();
   MX_I2C2_Init();
@@ -247,61 +245,40 @@ int main(void){
   MX_ADC3_Init();
   MX_TIM1_Init();
   MX_ADC2_Init();
+  HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin, GPIO_PIN_SET);
+
+  // MX_USB_DEVICE_Init();
+
 
   // Init data packages
-  EcuData data;
+  volatile EcuData data;
   ecuFluidSystemData fluidSystemData;
 
   AltimeterMs5607Spi::Data altData;
-  AltimeterMs5607Spi::State altState;
-
+  volatile AltimeterMs5607Spi::State altState;
   //////////////////////////////////////  // GPS data package
-
   ImuBmi088Spi::Data imuData;
-
   MagBmi150i2c::Data magData;
 
-  HAL_GPIO_WritePin(ETH_nRST_GPIO_Port, ETH_nRST_Pin, GPIO_PIN_SET);
+  RadioSx127xSpi::State radioState;
+  //// memory init
 
-  HAL_GPIO_WritePin(TC0_nCS_GPIO_Port, TC0_nCS_Pin, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(TC1_nCS_GPIO_Port, TC1_nCS_Pin, GPIO_PIN_SET);
+  volatile int lol; // for testing, lol
 
-  // TODO: Remove temp
-  HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin, GPIO_PIN_SET);
+  /* Reset all of the senesors before init*/
+  lol = radio.Reset();
+  lol = altimeter.Reset();
+  lol = imu.Reset();
+  lol = magnetometer.Reset();
 
-  solenoidState0 = 0;
-  solenoidState1 = 0;
-  solenoidState2 = 0;
-  solenoidState3 = 0;
-
-  alarmState = 0; 
-  
-  // ethernet recieve-- remove later once TRS receive is done 
-  HAL_UART_Receive_IT(&huart3, commandBuffer, sizeof(EcuCommand));
-
-  // radio initialisation
-  if (!radio.Init())
-    radio.Reset();
-  if (!radio1.Init())
-    radio1.Reset(); 
-  if (!radio2.Init())
-    radio2.Reset();
-
-  // receive command from TRS
-  radio.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi); 
-  radio1.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi); 
-  radio2.Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi); 
-
-  // Array of radios for fallback
-  RadioSx127xSpi* radios[] = {&radio, &radio1, &radio2};
-  int currentRadioIndex = 0;
 
   // Init all of the sensors
-  memory1.Init();
-  memory2.Init();
-  altimeter.Init();
-  imu.Init();
-  magnetometer.Init();
+  lol = radio.Init();
+  altState = altimeter.Init();
+  lol = imu.Init();
+  lol = magnetometer.Init();
+
+  
 
   HAL_Delay(100); // just like wait until all the sensors are all initialised
 
@@ -311,155 +288,14 @@ int main(void){
   // Counter for memory write
   int memoryCounter = 0;
 
-  uint8_t memoryBuffer[64];
+  uint8_t memoryBuffer[sizeof(data)];
+
+  uint32_t usbBufferTimer = HAL_GetTick();
 
   while (1){
-    HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
-	  HAL_Delay(1000);    
     /*Double check if this is correct*/
     uint32_t timestamp = HAL_GetTick(); // replace later with timers 
     data.timestamp = timestamp;
-
-    // read the command from TRS
-    // do one radio for now-- will write others later
-    // plan is to basically check if the radio can receive and if it cant then switch radios 
-    RadioSx127xSpi::State state = radios[currentRadioIndex]->Update(); // do one radio for now-- will write others later
-    if (state == RadioSx127xSpi::State::RX_COMPLETE){
-      // check CRC
-      uint32_t crc = command.crc; 
-      command.crc = 0; 
-      if (crc == Crc32((uint8_t *)&command, sizeof(EcuCommand) - 4)){
-        newCommand = true; 
-        alarmState = command.alarm; 
-
-      }
-    }
-    else if ((state == RadioSx127xSpi::State::IDLE) || 
-             (state == RadioSx127xSpi::State::RX_TIMEOUT)){
-      radios[currentRadioIndex]->Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi);
-      // do nothing, just wait for the next command
-    }
-    else if (state == RadioSx127xSpi::State::ERROR){
-      // radio error, reset radio and reinit
-      radios[currentRadioIndex]->Reset();
-      radios[currentRadioIndex]->Init();
-
-      // switch to the next radio in the array
-      currentRadioIndex = (currentRadioIndex + 1) % (sizeof(radios) / sizeof(radios[0]));
-
-      // start receiving on the next radio
-      radios[currentRadioIndex]->Receive((uint8_t *)&commandBuffer, sizeof(EcuCommand), (int *)&data.packetRssi);
-    }
-
-    // updating internal states
-    if (newCommand){
-      newCommand = false; 
-
-      solenoidState0 = (int)(command.solenoidStateCoPvVent);
-      solenoidState1 = (int)(command.solenoidStatePv1);
-      solenoidState2 = (int)(command.solenoidStatePv2);
-      solenoidState3 = (int)(command.solenoidStateVent);
-    }
-
-    // internal states feedback
-    data.solenoidInternalStateCopvVent = (bool)solenoidState0;
-    data.solenoidInternalStatePv1 = (bool)solenoidState1;
-    data.solenoidInternalStatePv2 = (bool)solenoidState2;
-    data.solenoidInternalStateVent = (bool)solenoidState3;
-
-    // switch solenoids
-    HAL_GPIO_WritePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin, (GPIO_PinState)solenoidState0);
-    HAL_GPIO_WritePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin, (GPIO_PinState)solenoidState1);
-    HAL_GPIO_WritePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin, (GPIO_PinState)solenoidState2);
-    HAL_GPIO_WritePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin, (GPIO_PinState)solenoidState3);
-
-    // alarm- piezo buzzer
-    HAL_GPIO_WritePin(ALARM_GPIO_Port, ALARM_Pin, (GPIO_PinState)alarmState);
-
-    // ADC operations- sample averaging 
-    AdcData rawData = {0};
-    for (int i = 0; i < 16; i++) {
-      HAL_ADC_Start(&hadc1);
-      HAL_ADC_Start(&hadc2);
-      HAL_ADC_Start(&hadc3); 
-
-      HAL_ADC_PollForConversion(&hadc1, 10);
-      HAL_ADC_PollForConversion(&hadc2, 10);
-      HAL_ADC_PollForConversion(&hadc3, 10);
-
-      uint32_t data1 = HAL_ADC_GetValue(&hadc1);
-      *(((uint32_t *)&rawData) + i) += data1;
-      uint32_t data2 = HAL_ADC_GetValue(&hadc2);
-      *(((uint32_t *)&rawData) + i) += data2;
-      uint32_t data3 = HAL_ADC_GetValue(&hadc3);
-      *(((uint32_t *)&rawData) + i) += data3;
-    }
-
-    // battery voltages
-    data.batteryVoltage = 0.062f * (float)rawData.batteryVoltage + 0.435f; 
-    data.supplyVoltage = 0.062f * (float)rawData.supplyVoltage + 0.435f;  
-
-    // pressure data 
-    data.pressureCopv = 0.00128 * (float)rawData.pt0;
-    data.pressureLng = 0.00128 * (float)rawData.pt1;
-    data.pressureInjectorLng = 0.00128 * (float)rawData.pt2;
-    data.pressureLox = 0.00128 * (float)rawData.pt3;
-    data.pressureInjectorLox = 0.00128 * (float)rawData.pt4;
-    (void)(0.00128f * (float)rawData.pt5); // extra PT
-    (void)(0.00128f * (float)rawData.pt6); // extra PT
-
-    // read TC
-    TcMax31855Spi:: Data tcData; 
-    tcData = tc0.Read(); 
-    if (tcData.valid){
-      data.temperatureCopv = tcData.tcTemperature;
-    }
-    tcData = tc1.Read(); 
-    if (tcData.valid){
-      data.temperatureCopv = tcData.tcTemperature;
-    }
-
-    // solenoid
-    data.solenoidCurrentCopvVent = 0.000817f * (float)rawData.s0;
-    data.solenoidCurrentPv1 = 0.000817f * (float)rawData.s1;
-    data.solenoidCurrentPv2 = 0.000817f * (float)rawData.s2;
-    data.solenoidCurrentVent = 0.000817f * (float)rawData.s3;
-
-    // USB
-    char buffer[1024] = {0};
-    sprintf(buffer, 
-            "Timestamp: %08X\r\n"
-            "(1)CoPV Vent: %d-%04d   (2)PV1: %d-%04d  (3)PV2: %d-%04d  (4)Vent: %d-%04d\r\n"
-            "PRESSURE\r\n"
-            "CoPV Pressure: %04d  LNG Pressure: %04d  LNG INJ Pressure: %04d  LOX Pressure: %04d  LOX INJ Pressure: %04d\r\n"
-            "TEMPERATURE\r\n"
-            "CoPV Temperature: %03d"
-            "BATTERY\r\n"
-            "ECU Battery: %04d  Supply Voltage: %04d"
-            "---------------------\r\n", 
-            (unsigned int)(data.timestamp), 
-            (int)(data.solenoidInternalStateCopvVent), (int)(data.solenoidCurrentCopvVent * 1000),
-            (int)(data.solenoidInternalStatePv1), (int)(data.solenoidCurrentPv1 * 1000),
-            (int)(data.solenoidInternalStatePv2), (int)(data.solenoidCurrentPv2 * 1000),
-            (int)(data.solenoidCurrentVent), (int)(data.solenoidInternalStateVent * 1000),
-            (int)(data.pressureCopv * 1000),
-            (int)(data.pressureLng * 1000), (int)(data.pressureInjectorLng * 1000),
-            (int)(data.pressureLox * 1000), (int)(data.pressureInjectorLox * 1000),
-            (int)(data.temperatureCopv),
-            (int)(data.batteryVoltage), (int)(data.supplyVoltage)
-            );
-    CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
-
-    // ethernet
-    uint32_t crc = Crc32((uint8_t *)&data, sizeof(EcuData) - 4);
-    data.crc = crc;
-    // check if ethernet is connected
-    if (HAL_GPIO_ReadPin(ETH_nRST_GPIO_Port, ETH_nRST_Pin) == GPIO_PIN_SET) {
-      HAL_UART_Transmit(&huart3, (uint8_t *)&data, sizeof(EcuData), 100);
-    }
-    else {
-      // radio transmit :)
-    }
 
     
     /* Altimeter data */
@@ -487,46 +323,88 @@ int main(void){
     data.magneticFieldY = -magData.magneticFieldX;
     data.magneticFieldZ = magData.magneticFieldZ;
     
+    /* Radio */
+    // first radio at 915 MHz
+    uint8_t memoryBuffer[100];
+    if (radio._state == RadioSx127xSpi::State::IDLE || 
+        radio._state == RadioSx127xSpi::State::TX_COMPLETE){
+        // memcpy(memoryBuffer, &data, sizeof(data));
+        radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
+        HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
+    }
+    else if (radio._state == RadioSx127xSpi::State::TX_START ||
+        radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
+        radio.Update();
+        HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
+        HAL_Delay(500);
+    }
+
     /* Write to memory */
-    memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
-    if(memoryCounter % 2 == 0)
-    {
-      if (memory1.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
-        // reset the data from modules with lead time
-        data.temperature = 0xFFFF;
-        data.altitude = 0xFFFFFFFF;
-        data.ecefPositionX = 0xFFFFFFFF;
-        data.ecefPositionY = 0xFFFFFFFF;
-        data.ecefPositionZ = 0xFFFFFFFF;
-        data.ecefVelocityX = 0xFFFFFFFF;
-        data.ecefVelocityY = 0xFFFFFFFF;
-        data.ecefVelocityZ = 0xFFFFFFFF;
-        data.ecefPositionAccuracy = 0xFFFFFFFF;
-        data.ecefVelocityAccuracy = 0xFFFFFFFF;
+    // memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
+    // if(memoryCounter % 2 == 0)
+    // {
+    //   if (memory1.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
+    //     // reset the data from modules with lead time
+    //     data.temperature = 0xFFFF;
+    //     data.altitude = 0xFFFFFFFF;
+    //     data.ecefPositionX = 0xFFFFFFFF;
+    //     data.ecefPositionY = 0xFFFFFFFF;
+    //     data.ecefPositionZ = 0xFFFFFFFF;
+    //     data.ecefVelocityX = 0xFFFFFFFF;
+    //     data.ecefVelocityY = 0xFFFFFFFF;
+    //     data.ecefVelocityZ = 0xFFFFFFFF;
+    //     data.ecefPositionAccuracy = 0xFFFFFFFF;
+    //     data.ecefVelocityAccuracy = 0xFFFFFFFF;
 
-        // increment memory counter
-        memoryCounter++;
-      }
-    }
-    else
-    {
-      if (memory2.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
-        // reset the data from modules with lead time
-        data.temperature = 0xFFFF;
-        data.altitude = 0xFFFFFFFF;
-        data.ecefPositionX = 0xFFFFFFFF;
-        data.ecefPositionY = 0xFFFFFFFF;
-        data.ecefPositionZ = 0xFFFFFFFF;
-        data.ecefVelocityX = 0xFFFFFFFF;
-        data.ecefVelocityY = 0xFFFFFFFF;
-        data.ecefVelocityZ = 0xFFFFFFFF;
-        data.ecefPositionAccuracy = 0xFFFFFFFF;
-        data.ecefVelocityAccuracy = 0xFFFFFFFF;
+    //     // increment memory counter
+    //     memoryCounter++;
+    //   }
+    // }
+    // else
+    // {
+    //   if (memory2.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
+    //     // reset the data from modules with lead time
+    //     data.temperature = 0xFFFF;
+    //     data.altitude = 0xFFFFFFFF;
+    //     data.ecefPositionX = 0xFFFFFFFF;
+    //     data.ecefPositionY = 0xFFFFFFFF;
+    //     data.ecefPositionZ = 0xFFFFFFFF;
+    //     data.ecefVelocityX = 0xFFFFFFFF;
+    //     data.ecefVelocityY = 0xFFFFFFFF;
+    //     data.ecefVelocityZ = 0xFFFFFFFF;
+    //     data.ecefPositionAccuracy = 0xFFFFFFFF;
+    //     data.ecefVelocityAccuracy = 0xFFFFFFFF;
 
-        // increment memory counter
-        memoryCounter++;
-      }
-    }
+    //     // increment memory counter
+    //     memoryCounter++;
+    //   }
+    // }
+
+
+    // // USB
+    // char buffer[1024] = {0};
+    // if(data.timestamp - usbBufferTimer > 500)
+    // {
+    //     sprintf(buffer,
+    //         "Timestamp: %08X\r\n"
+    //         "AngV_X: %05d, AngV_Y: %05d, AngV_Z: %05d \r\n"
+    //         "AccX: %05d, AccY: %05d, AccZ: %05d \r\n"
+    //         "MagX: %05d, MagY: %05d, MagZ: %05d \r\n"
+    //         "Temp: %05d, Alt: %09d \r\n"
+    //         "---------------------\r\n\n",
+    //         (unsigned int)data.timestamp,
+    //         (int) data.angularVelocityX, (int) data.angularVelocityY, (int) data.angularVelocityZ,
+    //         (int) data.accelerationX, (int) data.accelerationY, (int) data.accelerationZ,
+    //         (int) data.temperature, (int) data.altitude);
+
+    //     sprintf(buffer, "1");
+    //     CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
+
+    //     //update buffer timer
+    //     usbBufferTimer = data.timestamp;
+
+    //     HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+    // }
   }
 }
 
@@ -1140,40 +1018,40 @@ static void MX_USART3_UART_Init(void)
 
 }
 
-/**
-  * @brief USB_OTG_FS Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USB_OTG_FS_PCD_Init(void)
-{
+// /**
+//   * @brief USB_OTG_FS Initialization Function
+//   * @param None
+//   * @retval None
+//   */
+// static void MX_USB_OTG_FS_PCD_Init(void)
+// {
 
-  /* USER CODE BEGIN USB_OTG_FS_Init 0 */
+//   /* USER CODE BEGIN USB_OTG_FS_Init 0 */
 
-  /* USER CODE END USB_OTG_FS_Init 0 */
+//   /* USER CODE END USB_OTG_FS_Init 0 */
 
-  /* USER CODE BEGIN USB_OTG_FS_Init 1 */
+//   /* USER CODE BEGIN USB_OTG_FS_Init 1 */
 
-  /* USER CODE END USB_OTG_FS_Init 1 */
-  hpcd_USB_OTG_FS.Instance = USB_OTG_FS;
-  hpcd_USB_OTG_FS.Init.dev_endpoints = 6;
-  hpcd_USB_OTG_FS.Init.speed = PCD_SPEED_FULL;
-  hpcd_USB_OTG_FS.Init.dma_enable = DISABLE;
-  hpcd_USB_OTG_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
-  hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;
-  hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;
-  hpcd_USB_OTG_FS.Init.lpm_enable = DISABLE;
-  hpcd_USB_OTG_FS.Init.vbus_sensing_enable = ENABLE;
-  hpcd_USB_OTG_FS.Init.use_dedicated_ep1 = DISABLE;
-  if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USB_OTG_FS_Init 2 */
+//   /* USER CODE END USB_OTG_FS_Init 1 */
+//   hpcd_USB_OTG_FS.Instance = USB_OTG_FS;
+//   hpcd_USB_OTG_FS.Init.dev_endpoints = 6;
+//   hpcd_USB_OTG_FS.Init.speed = PCD_SPEED_FULL;
+//   hpcd_USB_OTG_FS.Init.dma_enable = DISABLE;
+//   hpcd_USB_OTG_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
+//   hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;
+//   hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;
+//   hpcd_USB_OTG_FS.Init.lpm_enable = DISABLE;
+//   hpcd_USB_OTG_FS.Init.vbus_sensing_enable = ENABLE;
+//   hpcd_USB_OTG_FS.Init.use_dedicated_ep1 = DISABLE;
+//   if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   /* USER CODE BEGIN USB_OTG_FS_Init 2 */
 
-  /* USER CODE END USB_OTG_FS_Init 2 */
+//   /* USER CODE END USB_OTG_FS_Init 2 */
 
-}
+// }
 
 /**
   * @brief GPIO Initialization Function

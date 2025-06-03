@@ -29,6 +29,11 @@ bool RadioSx127xSpi::Reset() {
     HAL_GPIO_WritePin(_csPort, _csPin, GPIO_PIN_SET);
     HAL_Delay(1);
     HAL_GPIO_WritePin(_rstPort, _rstPin, GPIO_PIN_SET);
+
+    uint8_t lol;
+    volatile uint8_t lol2;
+    lol2 = ReadRegister(0x01,&lol);
+
     return true;
 }
 
@@ -70,7 +75,8 @@ bool RadioSx127xSpi::Init() {
     if (!WriteRegister(0x0F, 0x00)) return false;
 
     // set bandwidth, set coding rate, use implicit header mode
-    if (!WriteRegister(0x1D, 0b00000001 | ((uint8_t)_bandwidth << 4) | ((uint8_t)_codingRate << 1))) return false;
+    uint8_t headerMode = 0x00; // explicit mode
+    if (!WriteRegister(0x1D, headerMode | ((uint8_t)_bandwidth << 4) | ((uint8_t)_codingRate << 1))) return false;
 
     // set spreading factor, use non-continuous mode, set CRC, set RX timeout MSB
     if (!WriteRegister(0x1E, ((uint8_t)_spreadingFactor << 4) | ((uint8_t)_crcEnable << 2) | ((uint8_t)(0x3 & (_rxTimeout >> 8))))) return false;
@@ -125,13 +131,20 @@ RadioSx127xSpi::State RadioSx127xSpi::Update() {
 
             // standby mode
             if (!WriteRegister(0x01, 0b10000001)) _state = State::ERROR;
+            uint8_t lol;
+            volatile uint8_t lol2;
+            lol2 = ReadRegister(0x01,&lol);
 
             // clear all IRQ
             if (!WriteRegister(0x12, 0xFF)) _state = State::ERROR;
+            lol = 0;
+            lol2 = ReadRegister(0x12,&lol);
 
             // set payload length
             if (!WriteRegister(0x22, _payloadLength)) _state = State::ERROR;
-
+            lol = 0;
+            lol2 = ReadRegister(0x22,&lol);
+            
             // set FIFO address pointer
             if (!WriteRegister(0x0D, 0x00)) _state = State::ERROR;
 
@@ -145,6 +158,8 @@ RadioSx127xSpi::State RadioSx127xSpi::Update() {
 
             // start TX
             if (!WriteRegister(0x01, 0b10000011)) _state = State::ERROR;
+            HAL_Delay(10);
+            ReadRegister(0x01,&lol);
 
             _txStartTime = HAL_GetTick();
 
@@ -248,7 +263,7 @@ bool RadioSx127xSpi::ReadRegister(uint8_t address, uint8_t *data) {
     HAL_GPIO_WritePin(_csPort, _csPin, GPIO_PIN_RESET);
     if (HAL_SPI_TransmitReceive(_hspi, payload, buffer, 2, _serialTimeout) != HAL_OK) opStatus = false;
     HAL_GPIO_WritePin(_csPort, _csPin, GPIO_PIN_SET);
-    *data = buffer[1];
+    *data = buffer[0];
     return opStatus;
 }
 

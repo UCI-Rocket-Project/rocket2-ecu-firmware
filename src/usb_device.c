@@ -80,7 +80,8 @@ void MX_USB_DEVICE_Init(void)
   {
     Error_Handler();
   }
-  if (USBD_Start(&hUsbDeviceFS) != USBD_OK)
+  USBD_StatusTypeDef lol = USBD_Start(&hUsbDeviceFS);
+  if (lol != USBD_OK)
   {
     Error_Handler();
   }
