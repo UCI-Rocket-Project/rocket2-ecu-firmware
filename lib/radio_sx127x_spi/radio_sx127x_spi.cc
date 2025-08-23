@@ -263,7 +263,7 @@ bool RadioSx127xSpi::ReadRegister(uint8_t address, uint8_t *data) {
     HAL_GPIO_WritePin(_csPort, _csPin, GPIO_PIN_RESET);
     if (HAL_SPI_TransmitReceive(_hspi, payload, buffer, 2, _serialTimeout) != HAL_OK) opStatus = false;
     HAL_GPIO_WritePin(_csPort, _csPin, GPIO_PIN_SET);
-    *data = buffer[0];
+    *data = buffer[1]; // buffer[0] was found to be outputting bullshit SPI data 
     return opStatus;
 }
 

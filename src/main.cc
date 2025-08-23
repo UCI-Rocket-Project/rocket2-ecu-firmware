@@ -181,11 +181,12 @@ ImuBmi088Spi imu(&hspi6, IMU_nCS1_GPIO_Port, IMU_nCS1_Pin, IMU_nCS2_GPIO_Port, I
 
 MagBmi150i2c magnetometer(&hi2c1, MAG_INT_GPIO_Port, MAG_INT_Pin, MAG_DRDY_GPIO_Port, MAG_DRDY_Pin);
 
-RadioSx127xSpi radio(&hspi5, RADIO2_nCS_GPIO_Port, RADIO2_nCS_Pin, RADIO2_nRST_GPIO_Port, 
-                      RADIO2_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
+// MAJOR NOTE, BAUD RATE PRESCALAR HAS TO BE SPI_BAUDRATEPRESCALER_8
+RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO_Port, 
+                      RADIO_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
                       RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW125KHZ, 
                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
-                      8, true, 1023, 1023);
+                      8, true, 10023, 10023);
 
 // RadioSx127xSpi radio1(&hspi5, RADIO1_nCS_GPIO_Port, RADIO1_nCS_Pin, RADIO1_nRST_GPIO_Port, 
 //                       RADIO1_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
@@ -251,7 +252,7 @@ int main(void){
 
 
   // Init data packages
-  volatile EcuData data;
+  EcuData data;
   ecuFluidSystemData fluidSystemData;
 
   AltimeterMs5607Spi::Data altData;
@@ -292,6 +293,8 @@ int main(void){
 
   uint32_t usbBufferTimer = HAL_GetTick();
 
+  int rssi = 0;  
+
   while (1){
     /*Double check if this is correct*/
     uint32_t timestamp = HAL_GetTick(); // replace later with timers 
@@ -325,18 +328,15 @@ int main(void){
     
     /* Radio */
     // first radio at 915 MHz
-    uint8_t memoryBuffer[100];
     if (radio._state == RadioSx127xSpi::State::IDLE || 
         radio._state == RadioSx127xSpi::State::TX_COMPLETE){
-        // memcpy(memoryBuffer, &data, sizeof(data));
+        memcpy(memoryBuffer, &data, sizeof(data));
         radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
         HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
     }
     else if (radio._state == RadioSx127xSpi::State::TX_START ||
         radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
         radio.Update();
-        HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
-        HAL_Delay(500);
     }
 
     /* Write to memory */
@@ -824,7 +824,7 @@ static void MX_SPI5_Init(void)
   hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi5.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi5.Init.NSS = SPI_NSS_SOFT;
-  hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
