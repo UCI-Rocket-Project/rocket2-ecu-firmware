@@ -1,9 +1,5 @@
 #include "gnss_ubloxM8_uart.h"
 
-#include "stm32h7xx_hal_def.h"
-
-extern uint8_t gnssBuffer[100];
-
 GnssUbloxM8Uart::GnssUbloxM8Uart(UART_HandleTypeDef *huart, unsigned int serialTimeout) : _huart(huart), _serialTimeout(serialTimeout) {}
 
 bool GnssUbloxM8Uart::Reset() {
@@ -13,20 +9,27 @@ bool GnssUbloxM8Uart::Reset() {
     uint8_t payload[packet.payloadLength + 8];
     EncodePacket(payload, packet);
 
+    bool success = true;
+
     // try possible baud rates
     ChangeBaud(9600);
-    if (HAL_UART_Transmit(_huart, payload, packet.payloadLength + 8, _serialTimeout) != HAL_OK) return false;
-
+    if (HAL_UART_Transmit(_huart, payload, packet.payloadLength + 8, _serialTimeout) != HAL_OK) {
+        success = false;
+    }
+    
     ChangeBaud(460800);
-    if (HAL_UART_Transmit(_huart, payload, packet.payloadLength + 8, _serialTimeout) != HAL_OK) return false;
+    if (HAL_UART_Transmit(_huart, payload, packet.payloadLength + 8, _serialTimeout) != HAL_OK) {
+        success = false;
+    }
 
-    return true;
+    return success; 
 }
 
 bool GnssUbloxM8Uart::Init() {
     ChangeBaud(9600);
 
     // disable all NMEA message output, set 460800 baud
+    bool psuc = true;
     UBX_CFG_PRT portConfig;
     portConfig.portID = 1;
     portConfig.txReady = 0x0000;
@@ -35,46 +38,64 @@ bool GnssUbloxM8Uart::Init() {
     portConfig.inProtoMask = 0x0007;
     portConfig.outProtoMask = 0x0001;
     portConfig.flags = 0x0000;
-    if (!SetCommand(portConfig, false)) return false;
+    if (!SetCommand(portConfig, false)) {
+        psuc = false;
+    }
 
     ChangeBaud(460800);
+/*    
+    if (!CheckAck(portConfig)) {
+
+        return false;
+    }*/
 
     HAL_Delay(1000);
 
     // configure navigation engine: airborne 4g dynamic model, 3D fix only
+    bool nsuc = true;
     UBX_CFG_NAV5 navConfig;
     navConfig.mask = 0x0005;
     navConfig.dynModel = 8;
     navConfig.fixMode = 2;
     navConfig.fixedAlt = 0;
     navConfig.fixedAltVar = 10000;
-    if (!SetCommand(navConfig, true)) return false;
+    if (!SetCommand(navConfig, true)) {
+        nsuc = false;
+    }
 
     HAL_Delay(1000);
 
     // take measurement every 50ms, produce solution every measurement, use GPS time reference
+    bool rsuc = true;
     UBX_CFG_RATE rateConfig;
     rateConfig.measRate = 50;
     rateConfig.navRate = 1;
     rateConfig.timeRef = 1;
-    if (!SetCommand(rateConfig, true)) return false;
+    if (!SetCommand(rateConfig, true)) {
+        rsuc = false;
+    }
 
     HAL_Delay(1000);
 
     // output NAV-PVT solution as frequently as possible
+    bool msuc = true;
     UBX_CFG_MSG msgConfig;
     msgConfig.msgClass = 0x01;
     msgConfig.msgID = 0x07;
     msgConfig.rate = 1;
-    if (!SetCommand(msgConfig, true)) return false;
+    if (!SetCommand(msgConfig, true)) {
+        msuc = false;
+    }
 
-    return true;
+
+
+    return psuc && nsuc && rsuc && msuc;
 }
 
 bool GnssUbloxM8Uart::Poll(Data &data) {
     if (!_polling) {
         __HAL_UART_CLEAR_OREFLAG(_huart);
-        _huart->Instance->RDR;
+        _huart->Instance->DR;
         HAL_UART_Receive_DMA(_huart, gnssBuffer, sizeof(gnssBuffer));
         _polling = true;
     }

@@ -126,4 +126,10 @@ struct UBX_CFG_NAV5 {
     uint8_t reserved2[5] = {0};
 };
 
+struct UBX_MON_VER {
+    const uint8_t packetClass = 0x0A;
+    const uint8_t packetId = 0x04;
+    const uint16_t payloadLength = sizeof(UBX_MON_VER) - 4;
+};
+
 #pragma pack(pop)

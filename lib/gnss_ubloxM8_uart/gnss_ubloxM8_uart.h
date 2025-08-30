@@ -2,7 +2,14 @@
 
 #include <cstring>
 
-#include "stm32h7xx_hal.h"
+#if defined(STM32F1)
+#include "stm32f4xx_hal.h"
+#elif defined(disco_f469ni)
+#include "stm32f4xx_hal.h"
+#elif defined(STM32F4)
+#include <stm32f4xx_hal.h>
+#endif
+
 #include "ubx_messages.h"
 
 class GnssUbloxM8Uart {
@@ -99,6 +106,8 @@ class GnssUbloxM8Uart {
     UART_HandleTypeDef *_huart;
     unsigned int _serialTimeout;
 
+    uint8_t gnssBuffer[100];
+
     UBX_NAV_PVT _data;
     bool _polling = false;
     bool _newData = false;
@@ -177,18 +186,24 @@ class GnssUbloxM8Uart {
 
         // clear potential overrun flags and leftover data
         __HAL_UART_CLEAR_OREFLAG(_huart);
-        _huart->Instance->RDR;
+        _huart->Instance->DR;
 
+        // NOTE FOR TOMORROW: PSUC SEEMS TO BE BEING OVERFLOWN INTO SOMEHOW IN THIS FUNCTION!!!! BUGGY AS FRICKKK
         if (HAL_UART_Transmit(_huart, payload, packet.payloadLength + 8, _serialTimeout) != HAL_OK) return false;
 
-        if (checkAck) {
-            UBX_ACK_ACK ack;
-            uint8_t buffer[ack.payloadLength + 8] = {0};
-            if (HAL_UART_Receive(_huart, buffer, ack.payloadLength + 8, _serialTimeout) != HAL_OK) return false;
-            if (!DecodePacket(ack, buffer)) return false;
-            if (ack.clsID != packet.packetClass) return false;
-            if (ack.msgID != packet.packetId) return false;
-        }
+        bool ack = checkAck ? CheckAck(packet) : true;
+
+        return ack;
+    }
+
+    template <typename T>
+    bool CheckAck(T packet) {
+        UBX_ACK_ACK ack;
+        uint8_t buffer[ack.payloadLength + 8] = {0};
+        if (HAL_UART_Receive(_huart, buffer, ack.payloadLength + 8, _serialTimeout) != HAL_OK) return false;
+        if (!DecodePacket(ack, buffer)) return false;
+        if (ack.clsID != packet.packetClass) return false;
+        if (ack.msgID != packet.packetId) return false;
 
         return true;
     }

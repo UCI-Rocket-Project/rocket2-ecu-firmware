@@ -27,6 +27,7 @@
 
 #include "altimeter_ms5607_spi.h"
 // #include "gps_ubxm8_i2c.h"
+#include "gnss_ubloxM8_uart.h"
 #include "imu_bmi088_spi.h"
 #include "magnetometer_bmi150_i2c.h"
 #include "memory_w25q1128jv_spi.h"
@@ -69,6 +70,7 @@ struct EcuCommand {
 };
 
 struct EcuData {
+  uint8_t type = 0x01;
   uint32_t timestamp;
   float packetRssi;
   float packetLoss;
@@ -200,6 +202,8 @@ RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO
 //                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
 //                       8, true, 500, 1023);
 
+GnssUbloxM8Uart gps(&huart4, 1000);
+
 // alarm- piezo buzzer 
 int alarmState; 
 
@@ -218,6 +222,7 @@ static void MX_SPI3_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SPI5_Init(void);
 static void MX_SPI6_Init(void);
+static void MX_DMA_Init(void);
 static void MX_UART4_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_ADC3_Init(void);
@@ -241,6 +246,7 @@ int main(void){
   MX_SPI4_Init();
   MX_SPI5_Init();
   MX_SPI6_Init();
+  MX_DMA_Init();
   MX_UART4_Init();
   MX_USART3_UART_Init();
   MX_ADC3_Init();
@@ -257,9 +263,9 @@ int main(void){
 
   AltimeterMs5607Spi::Data altData;
   volatile AltimeterMs5607Spi::State altState;
-  //////////////////////////////////////  // GPS data package
   ImuBmi088Spi::Data imuData;
   MagBmi150i2c::Data magData;
+  GnssUbloxM8Uart::Data gpsData;
 
   RadioSx127xSpi::State radioState;
   //// memory init
@@ -271,6 +277,7 @@ int main(void){
   lol = altimeter.Reset();
   lol = imu.Reset();
   lol = magnetometer.Reset();
+  lol = gps.Reset();
 
 
   // Init all of the sensors
@@ -278,6 +285,8 @@ int main(void){
   altState = altimeter.Init();
   lol = imu.Init();
   lol = magnetometer.Init();
+  lol = gps.Init();
+
 
   
 
@@ -325,6 +334,11 @@ int main(void){
     data.magneticFieldX = magData.magneticFieldY;
     data.magneticFieldY = -magData.magneticFieldX;
     data.magneticFieldZ = magData.magneticFieldZ;
+
+    /* Gps data */
+    bool gpsSuccess = gps.Poll(gpsData);
+
+    if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
     
     /* Radio */
     // first radio at 915 MHz
@@ -332,7 +346,7 @@ int main(void){
         radio._state == RadioSx127xSpi::State::TX_COMPLETE){
         memcpy(memoryBuffer, &data, sizeof(data));
         radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
-        HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
+        //HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
     }
     else if (radio._state == RadioSx127xSpi::State::TX_START ||
         radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
@@ -415,6 +429,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
       newCommand = true;
   }
   HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));
+  gps.DMACompleteCallback();
 }
 
 /**
@@ -461,6 +476,25 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+* Enable DMA controller clock
+*/
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+
 }
 
 /**
