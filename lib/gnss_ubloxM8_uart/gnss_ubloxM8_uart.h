@@ -106,16 +106,26 @@ class GnssUbloxM8Uart {
     UART_HandleTypeDef *_huart;
     unsigned int _serialTimeout;
 
-    uint8_t gnssBuffer[100];
+    uint8_t gnssBuffer[101];
 
     UBX_NAV_PVT _data;
     bool _polling = false;
     bool _newData = false;
 
-    void ChangeBaud(int baud) {
-        _huart->Instance->CR1 &= ~(USART_CR1_UE);
-        _huart->Instance->BRR = (uint32_t)((HAL_RCC_GetPCLK2Freq() + baud / 2) / baud);
-        _huart->Instance->CR1 |= USART_CR1_UE;
+    HAL_StatusTypeDef ChangeBaud(int baud) {
+        if (HAL_UART_DeInit(_huart) != HAL_OK)
+        {
+            return HAL_ERROR;
+        }
+
+        _huart->Init.BaudRate = baud;
+
+        if (HAL_UART_Init(_huart) != HAL_OK)
+        {
+            return HAL_ERROR;
+        }
+
+        return HAL_OK;
     }
 
     /**
@@ -183,25 +193,33 @@ class GnssUbloxM8Uart {
     bool SetCommand(T packet, bool checkAck) {
         uint8_t payload[packet.payloadLength + 8];
         EncodePacket(payload, packet);
-
+        
+        /*
         // clear potential overrun flags and leftover data
         __HAL_UART_CLEAR_OREFLAG(_huart);
-        _huart->Instance->DR;
+        _huart->Instance->DR;*/
 
         // NOTE FOR TOMORROW: PSUC SEEMS TO BE BEING OVERFLOWN INTO SOMEHOW IN THIS FUNCTION!!!! BUGGY AS FRICKKK
-        if (HAL_UART_Transmit(_huart, payload, packet.payloadLength + 8, _serialTimeout) != HAL_OK) return false;
+        if (HAL_UART_Transmit(_huart, payload, packet.payloadLength + 7, _serialTimeout) != HAL_OK) return false;
 
+        return true;
+
+        /*
         bool ack = checkAck ? CheckAck(packet) : true;
 
         return ack;
+        */
     }
 
     template <typename T>
     bool CheckAck(T packet) {
         UBX_ACK_ACK ack;
         uint8_t buffer[ack.payloadLength + 8] = {0};
-        if (HAL_UART_Receive(_huart, buffer, ack.payloadLength + 8, _serialTimeout) != HAL_OK) return false;
-        if (!DecodePacket(ack, buffer)) return false;
+        HAL_StatusTypeDef stat = HAL_UART_Receive(_huart, buffer, ack.payloadLength + 8, _serialTimeout);
+        if (stat != HAL_OK) return false;
+        if (!DecodePacket(ack, buffer)) {
+            return false;
+        }
         if (ack.clsID != packet.packetClass) return false;
         if (ack.msgID != packet.packetId) return false;
 

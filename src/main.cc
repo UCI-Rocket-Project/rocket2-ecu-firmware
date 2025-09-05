@@ -156,6 +156,8 @@ SPI_HandleTypeDef hspi6;
 
 TIM_HandleTypeDef htim1;
 
+DMA_HandleTypeDef hdma_uart4_rx;
+DMA_HandleTypeDef hdma_uart4_tx;
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart3;
 
@@ -176,8 +178,6 @@ MemoryW25q1128jvSpi memory1(&hspi1, MEM1_nCS_GPIO_Port, MEM1_nCS_Pin);
 MemoryW25q1128jvSpi memory2(&hspi1, MEM2_nCS_GPIO_Port, MEM2_nCS_Pin);
 
 AltimeterMs5607Spi altimeter(&hspi4, ALT_nCS_GPIO_Port, ALT_nCS_Pin, ALT_MISO_GPIO_Port, ALT_MISO_Pin, 1014.9, 100);
-
-/////////////////////////////////////////// DO GPS LATER
 
 ImuBmi088Spi imu(&hspi6, IMU_nCS1_GPIO_Port, IMU_nCS1_Pin, IMU_nCS2_GPIO_Port, IMU_nCS2_Pin);
 
@@ -202,7 +202,7 @@ RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO
 //                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
 //                       8, true, 500, 1023);
 
-GnssUbloxM8Uart gps(&huart4, 1000);
+//GnssUbloxM8Uart gps(&huart4, 1000);
 
 // alarm- piezo buzzer 
 int alarmState; 
@@ -211,6 +211,9 @@ int alarmState;
 bool newCommand = false; 
 uint8_t commandBuffer[sizeof(EcuCommand)];
 EcuCommand command; 
+
+
+uint8_t gnssBuffer[101];
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
@@ -277,160 +280,206 @@ int main(void){
   lol = altimeter.Reset();
   lol = imu.Reset();
   lol = magnetometer.Reset();
-  lol = gps.Reset();
+  //lol = gps.Reset();
 
 
-  // Init all of the sensors
-  lol = radio.Init();
-  altState = altimeter.Init();
-  lol = imu.Init();
-  lol = magnetometer.Init();
-  lol = gps.Init();
 
+  uint8_t configUBX[]={
+	  0xB5,0x62, // Sync
+	  0x06,0x00, // Packet
+	  0x14,0x00, // Length
 
+	  // Payload
+	  0x01, // portID: 1
+	  0x00, // RESERVED
+	  0x00,0x00, // txReady: 0000 0000 0000 0000 | DISABLED
+	  0xD0,0x08,0x00,0x00, // mode: 0000 0000 0000 0000 0000 1000 1101 0000 | 8 bit char len, no parity, 1 stop bit
+	  0x80,0x25,0x00,0x00, // baud rate: 0000 0000 0000 0000 0010 0101 1000 0000 | 9600
+	  0x01,0x00, // inProtoMask: 0000 0000 0000 0001 | UBX enabled, disable all other protocols for input to module
+	  0x01,0x00, // outProtoMask: 0000 0000 0000 0001 | UBX enabled, disable all other protocols for output from module
+	  0x00,0x00, // flags: 0000 0000 0000 0000 | non-extended TX timeout
+	  0x00,0x00, // RESERVED
+
+	  0x9A,0x79 // Checksum
+  };
+  HAL_UART_Transmit_DMA(&huart4, configUBX, sizeof(configUBX) / sizeof(uint8_t));
+  HAL_Delay(1250);
+
+  uint8_t readPortConfig[]={
+	  0xB5,0x62, // Sync
+	  0x06,0x00, // Packet
+	  0x01,0x00, // Length
+
+	  // Payload
+	  0x01, // portID: 1
+
+	  0x08,0x22 // Checksum
+  };
+  HAL_UART_Transmit_DMA(&huart4, readPortConfig, sizeof(readPortConfig) / sizeof(uint8_t));
+
+  HAL_UART_Receive_DMA(&huart4, gnssBuffer, 1);
+
+  while (1) {
+	  HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+	  HAL_Delay(500);
+  }
   
 
-  HAL_Delay(100); // just like wait until all the sensors are all initialised
 
-  /* Buffer variables */
+  // // Init all of the sensors
+  // lol = radio.Init();
+  // altState = altimeter.Init();
+  // lol = imu.Init();
+  // lol = magnetometer.Init();
+  // //lol = gps.Init();
+  
+  // HAL_Delay(100); // just like wait until all the sensors are all initialised
 
-  // Memory oscillates between writing between the 2 modules
-  // Counter for memory write
-  int memoryCounter = 0;
+  // /* Buffer variables */
 
-  uint8_t memoryBuffer[sizeof(data)];
+  // // Memory oscillates between writing between the 2 modules
+  // // Counter for memory write
+  // int memoryCounter = 0;
 
-  uint32_t usbBufferTimer = HAL_GetTick();
+  // uint8_t memoryBuffer[sizeof(data)];
 
-  int rssi = 0;  
+  // uint32_t usbBufferTimer = HAL_GetTick();
 
-  while (1){
-    /*Double check if this is correct*/
-    uint32_t timestamp = HAL_GetTick(); // replace later with timers 
-    data.timestamp = timestamp;
+  // int rssi = 0;  
+
+  // while (1){
+  //   /*Double check if this is correct*/
+  //   uint32_t timestamp = HAL_GetTick(); // replace later with timers 
+  //   data.timestamp = timestamp;
 
     
-    /* Altimeter data */
-    altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
-    if (altState == AltimeterMs5607Spi::State::COMPLETE) {
-        altData = altimeter.GetData();
-        data.temperature = altData.temperature;
-        data.altitude = altData.altitude;
-    }
+  //   /* Altimeter data */
+  //   altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
+  //   if (altState == AltimeterMs5607Spi::State::COMPLETE) {
+  //       altData = altimeter.GetData();
+  //       data.temperature = altData.temperature;
+  //       data.altitude = altData.altitude;
+  //   }
 
-    /* GPS data */
+  //   /* GPS data */
 
-    /* IMU data */
-    imuData = imu.Read();
-    data.angularVelocityX = -imuData.angularVelocityX;
-    data.angularVelocityY = imuData.angularVelocityY;
-    data.angularVelocityZ = -imuData.angularVelocityZ;
-    data.accelerationX = -imuData.accelerationX;
-    data.accelerationY = imuData.accelerationY;
-    data.accelerationZ = -imuData.accelerationZ;
+  //   /* IMU data */
+  //   imuData = imu.Read();
+  //   data.angularVelocityX = -imuData.angularVelocityX;
+  //   data.angularVelocityY = imuData.angularVelocityY;
+  //   data.angularVelocityZ = -imuData.angularVelocityZ;
+  //   data.accelerationX = -imuData.accelerationX;
+  //   data.accelerationY = imuData.accelerationY;
+  //   data.accelerationZ = -imuData.accelerationZ;
 
-    /* Magnetometer data */
-    magData = magnetometer.Read();
-    data.magneticFieldX = magData.magneticFieldY;
-    data.magneticFieldY = -magData.magneticFieldX;
-    data.magneticFieldZ = magData.magneticFieldZ;
+  //   /* Magnetometer data */
+  //   magData = magnetometer.Read();
+  //   data.magneticFieldX = magData.magneticFieldY;
+  //   data.magneticFieldY = -magData.magneticFieldX;
+  //   data.magneticFieldZ = magData.magneticFieldZ;
 
-    /* Gps data */
-    bool gpsSuccess = gps.Poll(gpsData);
+  //   /* Gps data */
+  //   //bool gpsSuccess = gps.Poll(gpsData);
 
-    if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+  //   //if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
     
-    /* Radio */
-    // first radio at 915 MHz
-    if (radio._state == RadioSx127xSpi::State::IDLE || 
-        radio._state == RadioSx127xSpi::State::TX_COMPLETE){
-        memcpy(memoryBuffer, &data, sizeof(data));
-        radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
-        //HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
-    }
-    else if (radio._state == RadioSx127xSpi::State::TX_START ||
-        radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
-        radio.Update();
-    }
+  //   /* Radio */
+  //   // first radio at 915 MHz
+  //   if (radio._state == RadioSx127xSpi::State::IDLE || 
+  //       radio._state == RadioSx127xSpi::State::TX_COMPLETE){
+  //       memcpy(memoryBuffer, &data, sizeof(data));
+  //       radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
+  //       //HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
+  //   }
+  //   else if (radio._state == RadioSx127xSpi::State::TX_START ||
+  //       radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
+  //       radio.Update();
+  //   }
 
-    /* Write to memory */
-    // memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
-    // if(memoryCounter % 2 == 0)
-    // {
-    //   if (memory1.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
-    //     // reset the data from modules with lead time
-    //     data.temperature = 0xFFFF;
-    //     data.altitude = 0xFFFFFFFF;
-    //     data.ecefPositionX = 0xFFFFFFFF;
-    //     data.ecefPositionY = 0xFFFFFFFF;
-    //     data.ecefPositionZ = 0xFFFFFFFF;
-    //     data.ecefVelocityX = 0xFFFFFFFF;
-    //     data.ecefVelocityY = 0xFFFFFFFF;
-    //     data.ecefVelocityZ = 0xFFFFFFFF;
-    //     data.ecefPositionAccuracy = 0xFFFFFFFF;
-    //     data.ecefVelocityAccuracy = 0xFFFFFFFF;
+  //   /* Write to memory */
+  //   // memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
+  //   // if(memoryCounter % 2 == 0)
+  //   // {
+  //   //   if (memory1.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
+  //   //     // reset the data from modules with lead time
+  //   //     data.temperature = 0xFFFF;
+  //   //     data.altitude = 0xFFFFFFFF;
+  //   //     data.ecefPositionX = 0xFFFFFFFF;
+  //   //     data.ecefPositionY = 0xFFFFFFFF;
+  //   //     data.ecefPositionZ = 0xFFFFFFFF;
+  //   //     data.ecefVelocityX = 0xFFFFFFFF;
+  //   //     data.ecefVelocityY = 0xFFFFFFFF;
+  //   //     data.ecefVelocityZ = 0xFFFFFFFF;
+  //   //     data.ecefPositionAccuracy = 0xFFFFFFFF;
+  //   //     data.ecefVelocityAccuracy = 0xFFFFFFFF;
 
-    //     // increment memory counter
-    //     memoryCounter++;
-    //   }
-    // }
-    // else
-    // {
-    //   if (memory2.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
-    //     // reset the data from modules with lead time
-    //     data.temperature = 0xFFFF;
-    //     data.altitude = 0xFFFFFFFF;
-    //     data.ecefPositionX = 0xFFFFFFFF;
-    //     data.ecefPositionY = 0xFFFFFFFF;
-    //     data.ecefPositionZ = 0xFFFFFFFF;
-    //     data.ecefVelocityX = 0xFFFFFFFF;
-    //     data.ecefVelocityY = 0xFFFFFFFF;
-    //     data.ecefVelocityZ = 0xFFFFFFFF;
-    //     data.ecefPositionAccuracy = 0xFFFFFFFF;
-    //     data.ecefVelocityAccuracy = 0xFFFFFFFF;
+  //   //     // increment memory counter
+  //   //     memoryCounter++;
+  //   //   }
+  //   // }
+  //   // else
+  //   // {
+  //   //   if (memory2.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
+  //   //     // reset the data from modules with lead time
+  //   //     data.temperature = 0xFFFF;
+  //   //     data.altitude = 0xFFFFFFFF;
+  //   //     data.ecefPositionX = 0xFFFFFFFF;
+  //   //     data.ecefPositionY = 0xFFFFFFFF;
+  //   //     data.ecefPositionZ = 0xFFFFFFFF;
+  //   //     data.ecefVelocityX = 0xFFFFFFFF;
+  //   //     data.ecefVelocityY = 0xFFFFFFFF;
+  //   //     data.ecefVelocityZ = 0xFFFFFFFF;
+  //   //     data.ecefPositionAccuracy = 0xFFFFFFFF;
+  //   //     data.ecefVelocityAccuracy = 0xFFFFFFFF;
 
-    //     // increment memory counter
-    //     memoryCounter++;
-    //   }
-    // }
+  //   //     // increment memory counter
+  //   //     memoryCounter++;
+  //   //   }
+  //   // }
 
 
-    // // USB
-    // char buffer[1024] = {0};
-    // if(data.timestamp - usbBufferTimer > 500)
-    // {
-    //     sprintf(buffer,
-    //         "Timestamp: %08X\r\n"
-    //         "AngV_X: %05d, AngV_Y: %05d, AngV_Z: %05d \r\n"
-    //         "AccX: %05d, AccY: %05d, AccZ: %05d \r\n"
-    //         "MagX: %05d, MagY: %05d, MagZ: %05d \r\n"
-    //         "Temp: %05d, Alt: %09d \r\n"
-    //         "---------------------\r\n\n",
-    //         (unsigned int)data.timestamp,
-    //         (int) data.angularVelocityX, (int) data.angularVelocityY, (int) data.angularVelocityZ,
-    //         (int) data.accelerationX, (int) data.accelerationY, (int) data.accelerationZ,
-    //         (int) data.temperature, (int) data.altitude);
+  //   // // USB
+  //   // char buffer[1024] = {0};
+  //   // if(data.timestamp - usbBufferTimer > 500)
+  //   // {
+  //   //     sprintf(buffer,
+  //   //         "Timestamp: %08X\r\n"
+  //   //         "AngV_X: %05d, AngV_Y: %05d, AngV_Z: %05d \r\n"
+  //   //         "AccX: %05d, AccY: %05d, AccZ: %05d \r\n"
+  //   //         "MagX: %05d, MagY: %05d, MagZ: %05d \r\n"
+  //   //         "Temp: %05d, Alt: %09d \r\n"
+  //   //         "---------------------\r\n\n",
+  //   //         (unsigned int)data.timestamp,
+  //   //         (int) data.angularVelocityX, (int) data.angularVelocityY, (int) data.angularVelocityZ,
+  //   //         (int) data.accelerationX, (int) data.accelerationY, (int) data.accelerationZ,
+  //   //         (int) data.temperature, (int) data.altitude);
 
-    //     sprintf(buffer, "1");
-    //     CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
+  //   //     sprintf(buffer, "1");
+  //   //     CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
 
-    //     //update buffer timer
-    //     usbBufferTimer = data.timestamp;
+  //   //     //update buffer timer
+  //   //     usbBufferTimer = data.timestamp;
 
-    //     HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
-    // }
-  }
+  //   //     HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+  //   // }
+  // }
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-  uint32_t crc = Crc32(commandBuffer, sizeof(EcuCommand) - 4);
+  /*uint32_t crc = Crc32(commandBuffer, sizeof(EcuCommand) - 4);
   if (crc == ((EcuCommand *)commandBuffer)->crc) {
       memcpy((uint8_t *)&command, commandBuffer, sizeof(EcuCommand));
       newCommand = true;
   }
-  HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));
-  gps.DMACompleteCallback();
+  HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));*/
+
+  /*if (huart->Instance == UART4)
+  {
+    gps.DMACompleteCallback();
+  }*/
+ __NOP();
 }
+
 
 /**
   * @brief System Clock Configuration
@@ -848,7 +897,7 @@ static void MX_SPI5_Init(void)
   /* USER CODE END SPI5_Init 0 */
 
   /* USER CODE BEGIN SPI5_Init 1 */
-
+  
   /* USER CODE END SPI5_Init 1 */
   /* SPI5 parameter configuration*/
   hspi5.Instance = SPI5;
@@ -1002,7 +1051,7 @@ static void MX_UART4_Init(void)
 
   /* USER CODE END UART4_Init 1 */
   huart4.Instance = UART4;
-  huart4.Init.BaudRate = 115200;
+  huart4.Init.BaudRate = 9600;
   huart4.Init.WordLength = UART_WORDLENGTH_8B;
   huart4.Init.StopBits = UART_STOPBITS_1;
   huart4.Init.Parity = UART_PARITY_NONE;
