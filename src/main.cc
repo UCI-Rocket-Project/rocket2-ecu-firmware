@@ -202,7 +202,7 @@ RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO
 //                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
 //                       8, true, 500, 1023);
 
-//GnssUbloxM8Uart gps(&huart4, 1000);
+GnssUbloxM8Uart gps(&huart4, 1000);
 
 // alarm- piezo buzzer 
 int alarmState; 
@@ -213,7 +213,7 @@ uint8_t commandBuffer[sizeof(EcuCommand)];
 EcuCommand command; 
 
 
-uint8_t gnssBuffer[101];
+//uint8_t gnssBuffer[101];
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
@@ -280,48 +280,12 @@ int main(void){
   lol = altimeter.Reset();
   lol = imu.Reset();
   lol = magnetometer.Reset();
-  //lol = gps.Reset();
-
-
-
-  uint8_t configUBX[]={
-	  0xB5,0x62, // Sync
-	  0x06,0x00, // Packet
-	  0x14,0x00, // Length
-
-	  // Payload
-	  0x01, // portID: 1
-	  0x00, // RESERVED
-	  0x00,0x00, // txReady: 0000 0000 0000 0000 | DISABLED
-	  0xD0,0x08,0x00,0x00, // mode: 0000 0000 0000 0000 0000 1000 1101 0000 | 8 bit char len, no parity, 1 stop bit
-	  0x80,0x25,0x00,0x00, // baud rate: 0000 0000 0000 0000 0010 0101 1000 0000 | 9600
-	  0x01,0x00, // inProtoMask: 0000 0000 0000 0001 | UBX enabled, disable all other protocols for input to module
-	  0x01,0x00, // outProtoMask: 0000 0000 0000 0001 | UBX enabled, disable all other protocols for output from module
-	  0x00,0x00, // flags: 0000 0000 0000 0000 | non-extended TX timeout
-	  0x00,0x00, // RESERVED
-
-	  0x9A,0x79 // Checksum
-  };
-  HAL_UART_Transmit_DMA(&huart4, configUBX, sizeof(configUBX) / sizeof(uint8_t));
-  HAL_Delay(1250);
-
-  uint8_t readPortConfig[]={
-	  0xB5,0x62, // Sync
-	  0x06,0x00, // Packet
-	  0x01,0x00, // Length
-
-	  // Payload
-	  0x01, // portID: 1
-
-	  0x08,0x22 // Checksum
-  };
-  HAL_UART_Transmit_DMA(&huart4, readPortConfig, sizeof(readPortConfig) / sizeof(uint8_t));
-
-  HAL_UART_Receive_DMA(&huart4, gnssBuffer, 1);
+  lol = gps.Reset();
+  
 
   while (1) {
 	  HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
-	  HAL_Delay(500);
+	  HAL_Delay(1000);
   }
   
 
@@ -473,11 +437,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   }
   HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));*/
 
-  /*if (huart->Instance == UART4)
+  __NOP();
+  if (huart->Instance == UART4)
   {
     gps.DMACompleteCallback();
-  }*/
- __NOP();
+  }
 }
 
 

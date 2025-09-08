@@ -55,12 +55,11 @@ bool GnssUbloxM8Uart::Reset() {
     _polling = true;
     HAL_StatusTypeDef stat = HAL_UART_Transmit_DMA(_huart, payload, packet.payloadLength + 8);*/
         
-
     uint8_t configUBX[]={
         0xB5,0x62, // Sync
         0x06,0x00, // Packet
         0x14,0x00, // Length
-
+  
         // Payload
         0x01, // portID: 1
         0x00, // RESERVED
@@ -71,25 +70,27 @@ bool GnssUbloxM8Uart::Reset() {
         0x01,0x00, // outProtoMask: 0000 0000 0000 0001 | UBX enabled, disable all other protocols for output from module
         0x00,0x00, // flags: 0000 0000 0000 0000 | non-extended TX timeout
         0x00,0x00, // RESERVED
-
+  
         0x9A,0x79 // Checksum
     };
-    HAL_UART_Transmit_DMA(_huart, configUBX, sizeof(configUBX) / sizeof(uint8_t));
+    
+    HAL_StatusTypeDef state1 = HAL_UART_Transmit_DMA(_huart, configUBX, sizeof(configUBX) / sizeof(uint8_t));
     HAL_Delay(1250);
-
+  
     uint8_t readPortConfig[]={
         0xB5,0x62, // Sync
         0x06,0x00, // Packet
         0x01,0x00, // Length
-
+  
         // Payload
         0x01, // portID: 1
-
+  
         0x08,0x22 // Checksum
     };
-    HAL_UART_Transmit_DMA(_huart, readPortConfig, sizeof(readPortConfig) / sizeof(uint8_t));
-
-    HAL_UART_Receive_DMA(_huart, gnssBuffer, 26);
+    HAL_StatusTypeDef state2 = HAL_UART_Transmit_DMA(_huart, readPortConfig, sizeof(readPortConfig) / sizeof(uint8_t));
+  
+    HAL_StatusTypeDef state3 = HAL_UART_Receive_DMA(_huart, gnssBuffer, 26);
+    HAL_Delay(1250);
 
     
     return true;
@@ -199,5 +200,4 @@ bool GnssUbloxM8Uart::Poll(Data &data) {
 void GnssUbloxM8Uart::DMACompleteCallback() {
     _polling = false;
     _newData = DecodePacket(_data, gnssBuffer);
-    int a = 56;
 }
