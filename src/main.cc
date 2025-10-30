@@ -282,6 +282,8 @@ int main(void){
   lol = magnetometer.Reset();
   lol = gps.Reset();
   
+  HAL_StatusTypeDef state3 = HAL_UART_Receive_DMA(&huart4, gps.gnssBuffer, 26);
+  
 
   while (1) {
 	  HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);

@@ -102,11 +102,11 @@ class GnssUbloxM8Uart {
      */
     void DMACompleteCallback();
 
+    uint8_t gnssBuffer[101];
+
   private:
     UART_HandleTypeDef *_huart;
     unsigned int _serialTimeout;
-
-    uint8_t gnssBuffer[101];
 
     UBX_NAV_PVT _data;
     bool _polling = false;

@@ -89,8 +89,8 @@ bool GnssUbloxM8Uart::Reset() {
     };
     HAL_StatusTypeDef state2 = HAL_UART_Transmit_DMA(_huart, readPortConfig, sizeof(readPortConfig) / sizeof(uint8_t));
   
-    HAL_StatusTypeDef state3 = HAL_UART_Receive_DMA(_huart, gnssBuffer, 26);
-    HAL_Delay(1250);
+    // HAL_StatusTypeDef state3 = HAL_UART_Receive_DMA(_huart, gnssBuffer, 26);
+    // HAL_Delay(1250);
 
     
     return true;
