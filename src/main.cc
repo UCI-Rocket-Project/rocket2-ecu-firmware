@@ -184,7 +184,7 @@ MagBmi150i2c magnetometer(&hi2c1, MAG_INT_GPIO_Port, MAG_INT_Pin, MAG_DRDY_GPIO_
 
 // MAJOR NOTE, BAUD RATE PRESCALAR HAS TO BE SPI_BAUDRATEPRESCALER_8
 RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO_Port, 
-                      RADIO_nRST_Pin, 0x12, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
+                      RADIO_nRST_Pin, 0x12, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 17, 
                       RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW125KHZ, 
                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
                       8, true, 10023, 10023);
