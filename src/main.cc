@@ -185,7 +185,7 @@ MagBmi150i2c magnetometer(&hi2c1, MAG_INT_GPIO_Port, MAG_INT_Pin, MAG_DRDY_GPIO_
 
 // MAJOR NOTE, BAUD RATE PRESCALAR HAS TO BE SPI_BAUDRATEPRESCALER_8
 RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO_Port, 
-                      RADIO_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
+                      RADIO_nRST_Pin, 0x12, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
                       RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW125KHZ, 
                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
                       8, true, 10023, 10023);
@@ -241,7 +241,7 @@ int main(void){
   SystemClock_Config();
 
   MX_GPIO_Init();
-  MX_ADC1_Init();
+  //MX_ADC1_Init();
   MX_I2C1_Init();
   MX_I2C2_Init();
   MX_SPI1_Init();
@@ -254,7 +254,7 @@ int main(void){
   MX_USART3_UART_Init();
   MX_ADC3_Init();
   MX_TIM1_Init();
-  MX_ADC2_Init();
+  //MX_ADC2_Init();
   HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin, GPIO_PIN_SET);
 
   // MX_USB_DEVICE_Init();
@@ -285,150 +285,152 @@ int main(void){
   HAL_StatusTypeDef state3 = HAL_UART_Receive_DMA(&huart4, gps.gnssBuffer, 26);
   
 
+  /*
   while (1) {
 	  HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
 	  HAL_Delay(1000);
   }
+    */
   
 
 
-  // // Init all of the sensors
-  // lol = radio.Init();
-  // altState = altimeter.Init();
-  // lol = imu.Init();
-  // lol = magnetometer.Init();
-  // //lol = gps.Init();
+  // Init all of the sensors
+  lol = radio.Init();
+  altState = altimeter.Init();
+  lol = imu.Init();
+  lol = magnetometer.Init();
+  //lol = gps.Init();
   
-  // HAL_Delay(100); // just like wait until all the sensors are all initialised
+  HAL_Delay(100); // just like wait until all the sensors are all initialised
 
-  // /* Buffer variables */
+  /* Buffer variables */
 
-  // // Memory oscillates between writing between the 2 modules
-  // // Counter for memory write
-  // int memoryCounter = 0;
+  // Memory oscillates between writing between the 2 modules
+  // Counter for memory write
+  int memoryCounter = 0;
 
-  // uint8_t memoryBuffer[sizeof(data)];
+  uint8_t memoryBuffer[sizeof(data)];
 
-  // uint32_t usbBufferTimer = HAL_GetTick();
+  uint32_t usbBufferTimer = HAL_GetTick();
 
-  // int rssi = 0;  
+  int rssi = 0;  
 
-  // while (1){
-  //   /*Double check if this is correct*/
-  //   uint32_t timestamp = HAL_GetTick(); // replace later with timers 
-  //   data.timestamp = timestamp;
+  while (1){
+    /*Double check if this is correct*/
+    uint32_t timestamp = HAL_GetTick(); // replace later with timers 
+    data.timestamp = timestamp;
 
     
-  //   /* Altimeter data */
-  //   altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
-  //   if (altState == AltimeterMs5607Spi::State::COMPLETE) {
-  //       altData = altimeter.GetData();
-  //       data.temperature = altData.temperature;
-  //       data.altitude = altData.altitude;
-  //   }
+    /* Altimeter data */
+    altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
+    if (altState == AltimeterMs5607Spi::State::COMPLETE) {
+        altData = altimeter.GetData();
+        data.temperature = altData.temperature;
+        data.altitude = altData.altitude;
+    }
 
-  //   /* GPS data */
+    /* GPS data */
 
-  //   /* IMU data */
-  //   imuData = imu.Read();
-  //   data.angularVelocityX = -imuData.angularVelocityX;
-  //   data.angularVelocityY = imuData.angularVelocityY;
-  //   data.angularVelocityZ = -imuData.angularVelocityZ;
-  //   data.accelerationX = -imuData.accelerationX;
-  //   data.accelerationY = imuData.accelerationY;
-  //   data.accelerationZ = -imuData.accelerationZ;
+    /* IMU data */
+    imuData = imu.Read();
+    data.angularVelocityX = -imuData.angularVelocityX;
+    data.angularVelocityY = imuData.angularVelocityY;
+    data.angularVelocityZ = -imuData.angularVelocityZ;
+    data.accelerationX = -imuData.accelerationX;
+    data.accelerationY = imuData.accelerationY;
+    data.accelerationZ = -imuData.accelerationZ;
 
-  //   /* Magnetometer data */
-  //   magData = magnetometer.Read();
-  //   data.magneticFieldX = magData.magneticFieldY;
-  //   data.magneticFieldY = -magData.magneticFieldX;
-  //   data.magneticFieldZ = magData.magneticFieldZ;
+    /* Magnetometer data */
+    magData = magnetometer.Read();
+    data.magneticFieldX = magData.magneticFieldY;
+    data.magneticFieldY = -magData.magneticFieldX;
+    data.magneticFieldZ = magData.magneticFieldZ;
 
-  //   /* Gps data */
-  //   //bool gpsSuccess = gps.Poll(gpsData);
+    /* Gps data */
+    //bool gpsSuccess = gps.Poll(gpsData);
 
-  //   //if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+    //if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
     
-  //   /* Radio */
-  //   // first radio at 915 MHz
-  //   if (radio._state == RadioSx127xSpi::State::IDLE || 
-  //       radio._state == RadioSx127xSpi::State::TX_COMPLETE){
-  //       memcpy(memoryBuffer, &data, sizeof(data));
-  //       radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
-  //       //HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
-  //   }
-  //   else if (radio._state == RadioSx127xSpi::State::TX_START ||
-  //       radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
-  //       radio.Update();
-  //   }
+    /* Radio */
+    // first radio at 915 MHz
+    if (radio._state == RadioSx127xSpi::State::IDLE || 
+        radio._state == RadioSx127xSpi::State::TX_COMPLETE){
+        memcpy(memoryBuffer, &data, sizeof(data));
+        radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
+        HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
+    }
+    else if (radio._state == RadioSx127xSpi::State::TX_START ||
+        radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
+        radio.Update();
+    }
 
-  //   /* Write to memory */
-  //   // memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
-  //   // if(memoryCounter % 2 == 0)
-  //   // {
-  //   //   if (memory1.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
-  //   //     // reset the data from modules with lead time
-  //   //     data.temperature = 0xFFFF;
-  //   //     data.altitude = 0xFFFFFFFF;
-  //   //     data.ecefPositionX = 0xFFFFFFFF;
-  //   //     data.ecefPositionY = 0xFFFFFFFF;
-  //   //     data.ecefPositionZ = 0xFFFFFFFF;
-  //   //     data.ecefVelocityX = 0xFFFFFFFF;
-  //   //     data.ecefVelocityY = 0xFFFFFFFF;
-  //   //     data.ecefVelocityZ = 0xFFFFFFFF;
-  //   //     data.ecefPositionAccuracy = 0xFFFFFFFF;
-  //   //     data.ecefVelocityAccuracy = 0xFFFFFFFF;
+    /* Write to memory */
+    // memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
+    // if(memoryCounter % 2 == 0)
+    // {
+    //   if (memory1.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
+    //     // reset the data from modules with lead time
+    //     data.temperature = 0xFFFF;
+    //     data.altitude = 0xFFFFFFFF;
+    //     data.ecefPositionX = 0xFFFFFFFF;
+    //     data.ecefPositionY = 0xFFFFFFFF;
+    //     data.ecefPositionZ = 0xFFFFFFFF;
+    //     data.ecefVelocityX = 0xFFFFFFFF;
+    //     data.ecefVelocityY = 0xFFFFFFFF;
+    //     data.ecefVelocityZ = 0xFFFFFFFF;
+    //     data.ecefPositionAccuracy = 0xFFFFFFFF;
+    //     data.ecefVelocityAccuracy = 0xFFFFFFFF;
 
-  //   //     // increment memory counter
-  //   //     memoryCounter++;
-  //   //   }
-  //   // }
-  //   // else
-  //   // {
-  //   //   if (memory2.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
-  //   //     // reset the data from modules with lead time
-  //   //     data.temperature = 0xFFFF;
-  //   //     data.altitude = 0xFFFFFFFF;
-  //   //     data.ecefPositionX = 0xFFFFFFFF;
-  //   //     data.ecefPositionY = 0xFFFFFFFF;
-  //   //     data.ecefPositionZ = 0xFFFFFFFF;
-  //   //     data.ecefVelocityX = 0xFFFFFFFF;
-  //   //     data.ecefVelocityY = 0xFFFFFFFF;
-  //   //     data.ecefVelocityZ = 0xFFFFFFFF;
-  //   //     data.ecefPositionAccuracy = 0xFFFFFFFF;
-  //   //     data.ecefVelocityAccuracy = 0xFFFFFFFF;
+    //     // increment memory counter
+    //     memoryCounter++;
+    //   }
+    // }
+    // else
+    // {
+    //   if (memory2.ChipWrite(memoryBuffer) == MemoryW25q1128jvSpi::State::COMPLETE) {
+    //     // reset the data from modules with lead time
+    //     data.temperature = 0xFFFF;
+    //     data.altitude = 0xFFFFFFFF;
+    //     data.ecefPositionX = 0xFFFFFFFF;
+    //     data.ecefPositionY = 0xFFFFFFFF;
+    //     data.ecefPositionZ = 0xFFFFFFFF;
+    //     data.ecefVelocityX = 0xFFFFFFFF;
+    //     data.ecefVelocityY = 0xFFFFFFFF;
+    //     data.ecefVelocityZ = 0xFFFFFFFF;
+    //     data.ecefPositionAccuracy = 0xFFFFFFFF;
+    //     data.ecefVelocityAccuracy = 0xFFFFFFFF;
 
-  //   //     // increment memory counter
-  //   //     memoryCounter++;
-  //   //   }
-  //   // }
+    //     // increment memory counter
+    //     memoryCounter++;
+    //   }
+    // }
 
 
-  //   // // USB
-  //   // char buffer[1024] = {0};
-  //   // if(data.timestamp - usbBufferTimer > 500)
-  //   // {
-  //   //     sprintf(buffer,
-  //   //         "Timestamp: %08X\r\n"
-  //   //         "AngV_X: %05d, AngV_Y: %05d, AngV_Z: %05d \r\n"
-  //   //         "AccX: %05d, AccY: %05d, AccZ: %05d \r\n"
-  //   //         "MagX: %05d, MagY: %05d, MagZ: %05d \r\n"
-  //   //         "Temp: %05d, Alt: %09d \r\n"
-  //   //         "---------------------\r\n\n",
-  //   //         (unsigned int)data.timestamp,
-  //   //         (int) data.angularVelocityX, (int) data.angularVelocityY, (int) data.angularVelocityZ,
-  //   //         (int) data.accelerationX, (int) data.accelerationY, (int) data.accelerationZ,
-  //   //         (int) data.temperature, (int) data.altitude);
+    // // USB
+    // char buffer[1024] = {0};
+    // if(data.timestamp - usbBufferTimer > 500)
+    // {
+    //     sprintf(buffer,
+    //         "Timestamp: %08X\r\n"
+    //         "AngV_X: %05d, AngV_Y: %05d, AngV_Z: %05d \r\n"
+    //         "AccX: %05d, AccY: %05d, AccZ: %05d \r\n"
+    //         "MagX: %05d, MagY: %05d, MagZ: %05d \r\n"
+    //         "Temp: %05d, Alt: %09d \r\n"
+    //         "---------------------\r\n\n",
+    //         (unsigned int)data.timestamp,
+    //         (int) data.angularVelocityX, (int) data.angularVelocityY, (int) data.angularVelocityZ,
+    //         (int) data.accelerationX, (int) data.accelerationY, (int) data.accelerationZ,
+    //         (int) data.temperature, (int) data.altitude);
 
-  //   //     sprintf(buffer, "1");
-  //   //     CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
+    //     sprintf(buffer, "1");
+    //     CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
 
-  //   //     //update buffer timer
-  //   //     usbBufferTimer = data.timestamp;
+    //     //update buffer timer
+    //     usbBufferTimer = data.timestamp;
 
-  //   //     HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
-  //   // }
-  // }
+    //     HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+    // }
+  }
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
@@ -616,57 +618,123 @@ static void MX_ADC2_Init(void)
 
 }
 
-/**
+        /**
   * @brief ADC3 Initialization Function
   * @param None
   * @retval None
+  * @note This function configures ADC3 to scan 7 channels (PT0-PT6)
+  * in Discontinuous Mode, 1 conversion per trigger.
+  * The scan order is:
+  * Rank 1: PT0 (ADC_CHANNEL_8)
+  * Rank 2: PT1 (ADC_CHANNEL_10)
+  * Rank 3: PT2 (ADC_CHANNEL_11)
+  * Rank 4: PT3 (ADC_CHANNEL_12)
+  * Rank 5: PT4 (ADC_CHANNEL_13)
+  * Rank 6: PT5 (ADC_CHANNEL_2)
+  * Rank 7: PT6 (ADC_CHANNEL_3)
   */
-static void MX_ADC3_Init(void)
-{
-
-  /* USER CODE BEGIN ADC3_Init 0 */
-
-  /* USER CODE END ADC3_Init 0 */
-
-  ADC_ChannelConfTypeDef sConfig = {0};
-
-  /* USER CODE BEGIN ADC3_Init 1 */
-
-  /* USER CODE END ADC3_Init 1 */
-
-  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
-  */
-  hadc3.Instance = ADC3;
-  hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
-  hadc3.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc3.Init.ScanConvMode = DISABLE;
-  hadc3.Init.ContinuousConvMode = DISABLE;
-  hadc3.Init.DiscontinuousConvMode = DISABLE;
-  hadc3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc3.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc3.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc3.Init.NbrOfConversion = 1;
-  hadc3.Init.DMAContinuousRequests = DISABLE;
-  hadc3.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  if (HAL_ADC_Init(&hadc3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-  sConfig.Channel = ADC_CHANNEL_8;
-  sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC3_Init 2 */
-
-  /* USER CODE END ADC3_Init 2 */
-
-}
+ static void MX_ADC3_Init(void)
+ {
+ 
+   /* USER CODE BEGIN ADC3_Init 0 */
+ 
+   /* USER CODE END ADC3_Init 0 */
+ 
+   ADC_ChannelConfTypeDef sConfig = {0};
+ 
+   /* USER CODE BEGIN ADC3_Init 1 */
+ 
+   /* USER CODE END ADC3_Init 1 */
+ 
+   /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+   */
+   hadc3.Instance = ADC3;
+   hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+   hadc3.Init.Resolution = ADC_RESOLUTION_12B;
+   hadc3.Init.ScanConvMode = ENABLE;
+   hadc3.Init.ContinuousConvMode = DISABLE;
+   hadc3.Init.DiscontinuousConvMode = ENABLE;
+   hadc3.Init.NbrOfDiscConversion = 1;
+   hadc3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+   hadc3.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+   hadc3.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+   hadc3.Init.NbrOfConversion = 7;
+   hadc3.Init.DMAContinuousRequests = DISABLE;
+   hadc3.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+   if (HAL_ADC_Init(&hadc3) != HAL_OK)
+   {
+     Error_Handler();
+   }
+ 
+   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+   */
+   sConfig.Channel = ADC_CHANNEL_2;
+   sConfig.Rank = 1;
+   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+   {
+     Error_Handler();
+   }
+ 
+   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+   */
+   sConfig.Channel = ADC_CHANNEL_3;
+   sConfig.Rank = 2;
+   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+   {
+     Error_Handler();
+   }
+ 
+   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+   */
+   sConfig.Channel = ADC_CHANNEL_8;
+   sConfig.Rank = 3;
+   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+   {
+     Error_Handler();
+   }
+ 
+   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+   */
+   sConfig.Channel = ADC_CHANNEL_10;
+   sConfig.Rank = 4;
+   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+   {
+     Error_Handler();
+   }
+ 
+   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+   */
+   sConfig.Channel = ADC_CHANNEL_11;
+   sConfig.Rank = 5;
+   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+   {
+     Error_Handler();
+   }
+ 
+   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+   */
+   sConfig.Channel = ADC_CHANNEL_12;
+   sConfig.Rank = 6;
+   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+   {
+     Error_Handler();
+   }
+ 
+   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+   */
+   sConfig.Channel = ADC_CHANNEL_13;
+   sConfig.Rank = 7;
+   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+   {
+     Error_Handler();
+   }
+   /* USER CODE BEGIN ADC3_Init 2 */
+ 
+   /* USER CODE END ADC3_Init 2 */
+ 
+ }
+ 
 
 /**
   * @brief I2C1 Initialization Function
