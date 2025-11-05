@@ -281,6 +281,8 @@ int main(void){
   lol = imu.Reset();
   lol = magnetometer.Reset();
   lol = gps.Reset();
+
+  HAL_Delay(1000);
   
   HAL_StatusTypeDef state3 = HAL_UART_Receive_DMA(&huart4, gps.gnssBuffer, 26);
   
@@ -302,6 +304,7 @@ int main(void){
   //lol = gps.Init();
   
   HAL_Delay(100); // just like wait until all the sensors are all initialised
+
 
   /* Buffer variables */
 
@@ -358,6 +361,33 @@ int main(void){
         memcpy(memoryBuffer, &data, sizeof(data));
         radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
         HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
+
+//        HAL_GPIO_TogglePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin);
+//        HAL_GPIO_TogglePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin);
+//        HAL_GPIO_TogglePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin);
+//        HAL_GPIO_TogglePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin);
+
+        AdcData adcData = {0};
+        uint32_t* pt_data_ptr = &adcData.pt0;
+
+        for (int i = 0; i < 7; i++) 
+        {
+            HAL_ADC_Start(&hadc3);
+            HAL_ADC_PollForConversion(&hadc3, 10);
+            uint32_t data = HAL_ADC_GetValue(&hadc3);
+            *(pt_data_ptr + i) = data;
+        }
+
+        // read thermocouples
+        TcMax31855Spi::Data tcData;
+        // (TC0 INOPERABLE)
+        // (TC1 INOPERABLE)
+        tcData = tc1.Read();
+        if (tcData.valid) {
+        float temp = tcData.tcTemperature;  // TC2 -> LOX Temperature
+        }
+
+
     }
     else if (radio._state == RadioSx127xSpi::State::TX_START ||
         radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
@@ -865,7 +895,7 @@ static void MX_SPI3_Init(void)
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -875,6 +905,18 @@ static void MX_SPI3_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN SPI3_Init 2 */
+   /*
+   * We must configure SPI_DIRECTION_2LINES_RXONLY in MX due to pin limitations.
+   * This has a strange implementation in ST's HAL code. See the following.
+   * https://community.st.com/s/question/0D53W00000pT7bPSAS/spi-receive-times-out-due-to-spiflagrxne-not-reseting-in-spiendrxtransaction
+   * By switching to SPI_DIRECTION_2LINES here, we can use the default HAL code without modification.
+   */
+   hspi3.Init.Direction = SPI_DIRECTION_2LINES;
+   // Optional: comment out this same code above USER CODE BEGIN SPI3_Init 2
+   if (HAL_SPI_Init(&hspi3) != HAL_OK)
+   {
+	   Error_Handler();
+   }
 
   /* USER CODE END SPI3_Init 2 */
 
