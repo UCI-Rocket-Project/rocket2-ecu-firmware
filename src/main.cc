@@ -319,80 +319,94 @@ int main(void){
   int rssi = 0;  
 
   while (1){
-    /*Double check if this is correct*/
-    uint32_t timestamp = HAL_GetTick(); // replace later with timers 
-    data.timestamp = timestamp;
 
     
-    /* Altimeter data */
-    altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
-    if (altState == AltimeterMs5607Spi::State::COMPLETE) {
-        altData = altimeter.GetData();
-        data.temperature = altData.temperature;
-        data.altitude = altData.altitude;
-    }
-
-    /* GPS data */
-
-    /* IMU data */
-    imuData = imu.Read();
-    data.angularVelocityX = -imuData.angularVelocityX;
-    data.angularVelocityY = imuData.angularVelocityY;
-    data.angularVelocityZ = -imuData.angularVelocityZ;
-    data.accelerationX = -imuData.accelerationX;
-    data.accelerationY = imuData.accelerationY;
-    data.accelerationZ = -imuData.accelerationZ;
-
-    /* Magnetometer data */
-    magData = magnetometer.Read();
-    data.magneticFieldX = magData.magneticFieldY;
-    data.magneticFieldY = -magData.magneticFieldX;
-    data.magneticFieldZ = magData.magneticFieldZ;
-
-    /* Gps data */
-    //bool gpsSuccess = gps.Poll(gpsData);
-
-    //if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
-    
-    /* Radio */
-    // first radio at 915 MHz
-    if (radio._state == RadioSx127xSpi::State::IDLE || 
-        radio._state == RadioSx127xSpi::State::TX_COMPLETE){
-        memcpy(memoryBuffer, &data, sizeof(data));
-        radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
-        HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
-
-//        HAL_GPIO_TogglePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin);
-//        HAL_GPIO_TogglePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin);
-//        HAL_GPIO_TogglePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin);
-//        HAL_GPIO_TogglePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin);
-
         AdcData adcData = {0};
         uint32_t* pt_data_ptr = &adcData.pt0;
 
         for (int i = 0; i < 7; i++) 
         {
             HAL_ADC_Start(&hadc3);
-            HAL_ADC_PollForConversion(&hadc3, 10);
+            HAL_ADC_PollForConversion(&hadc3, 100);
             uint32_t data = HAL_ADC_GetValue(&hadc3);
             *(pt_data_ptr + i) = data;
         }
 
-        // read thermocouples
-        TcMax31855Spi::Data tcData;
-        // (TC0 INOPERABLE)
-        // (TC1 INOPERABLE)
-        tcData = tc1.Read();
-        if (tcData.valid) {
-        float temp = tcData.tcTemperature;  // TC2 -> LOX Temperature
-        }
+        float data0 = 0.00128 * ((float) adcData.pt0);
+        float data1 = 0.00128 * ((float) adcData.pt1);
+        float data2 = 0.00128 * ((float) adcData.pt2);
+        float data3 = 0.00128 * ((float) adcData.pt3);
+        float data4 = 0.00128 * ((float) adcData.pt4);
+        float data5 = 0.00128 * ((float) adcData.pt5);
+        float data6 = 0.00128 * ((float) adcData.pt6);
+
+        HAL_Delay(500);
 
 
-    }
-    else if (radio._state == RadioSx127xSpi::State::TX_START ||
-        radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
-        radio.Update();
-    }
+//     /*Double check if this is correct*/
+//     uint32_t timestamp = HAL_GetTick(); // replace later with timers 
+//     data.timestamp = timestamp;
+
+    
+//     /* Altimeter data */
+//     altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
+//     if (altState == AltimeterMs5607Spi::State::COMPLETE) {
+//         altData = altimeter.GetData();
+//         data.temperature = altData.temperature;
+//         data.altitude = altData.altitude;
+//     }
+
+//     /* GPS data */
+
+//     /* IMU data */
+//     imuData = imu.Read();
+//     data.angularVelocityX = -imuData.angularVelocityX;
+//     data.angularVelocityY = imuData.angularVelocityY;
+//     data.angularVelocityZ = -imuData.angularVelocityZ;
+//     data.accelerationX = -imuData.accelerationX;
+//     data.accelerationY = imuData.accelerationY;
+//     data.accelerationZ = -imuData.accelerationZ;
+
+//     /* Magnetometer data */
+//     magData = magnetometer.Read();
+//     data.magneticFieldX = magData.magneticFieldY;
+//     data.magneticFieldY = -magData.magneticFieldX;
+//     data.magneticFieldZ = magData.magneticFieldZ;
+
+//     /* Gps data */
+//     //bool gpsSuccess = gps.Poll(gpsData);
+
+//     //if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+    
+//     /* Radio */
+//     // first radio at 915 MHz
+//     if (radio._state == RadioSx127xSpi::State::IDLE || 
+//         radio._state == RadioSx127xSpi::State::TX_COMPLETE){
+//         memcpy(memoryBuffer, &data, sizeof(data));
+//         radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
+//         HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
+
+// //        HAL_GPIO_TogglePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin);
+// //        HAL_GPIO_TogglePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin);
+// //        HAL_GPIO_TogglePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin);
+// //        HAL_GPIO_TogglePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin);
+
+
+//         // read thermocouples
+//         TcMax31855Spi::Data tcData;
+//         // (TC0 INOPERABLE)
+//         // (TC1 INOPERABLE)
+//         tcData = tc1.Read();
+//         if (tcData.valid) {
+//         float temp = tcData.tcTemperature;  // TC2 -> LOX Temperature
+//         }
+
+
+//     }
+//     else if (radio._state == RadioSx127xSpi::State::TX_START ||
+//         radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
+//         radio.Update();
+//     }
 
     /* Write to memory */
     // memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
@@ -648,123 +662,113 @@ static void MX_ADC2_Init(void)
 
 }
 
-        /**
+ 
+/**
   * @brief ADC3 Initialization Function
   * @param None
   * @retval None
-  * @note This function configures ADC3 to scan 7 channels (PT0-PT6)
-  * in Discontinuous Mode, 1 conversion per trigger.
-  * The scan order is:
-  * Rank 1: PT0 (ADC_CHANNEL_8)
-  * Rank 2: PT1 (ADC_CHANNEL_10)
-  * Rank 3: PT2 (ADC_CHANNEL_11)
-  * Rank 4: PT3 (ADC_CHANNEL_12)
-  * Rank 5: PT4 (ADC_CHANNEL_13)
-  * Rank 6: PT5 (ADC_CHANNEL_2)
-  * Rank 7: PT6 (ADC_CHANNEL_3)
   */
- static void MX_ADC3_Init(void)
- {
- 
-   /* USER CODE BEGIN ADC3_Init 0 */
- 
-   /* USER CODE END ADC3_Init 0 */
- 
-   ADC_ChannelConfTypeDef sConfig = {0};
- 
-   /* USER CODE BEGIN ADC3_Init 1 */
- 
-   /* USER CODE END ADC3_Init 1 */
- 
-   /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
-   */
-   hadc3.Instance = ADC3;
-   hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
-   hadc3.Init.Resolution = ADC_RESOLUTION_12B;
-   hadc3.Init.ScanConvMode = ENABLE;
-   hadc3.Init.ContinuousConvMode = DISABLE;
-   hadc3.Init.DiscontinuousConvMode = ENABLE;
-   hadc3.Init.NbrOfDiscConversion = 1;
-   hadc3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-   hadc3.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-   hadc3.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-   hadc3.Init.NbrOfConversion = 7;
-   hadc3.Init.DMAContinuousRequests = DISABLE;
-   hadc3.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-   if (HAL_ADC_Init(&hadc3) != HAL_OK)
-   {
-     Error_Handler();
-   }
- 
-   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-   */
-   sConfig.Channel = ADC_CHANNEL_2;
-   sConfig.Rank = 1;
-   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-   {
-     Error_Handler();
-   }
- 
-   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-   */
-   sConfig.Channel = ADC_CHANNEL_3;
-   sConfig.Rank = 2;
-   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-   {
-     Error_Handler();
-   }
- 
-   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-   */
-   sConfig.Channel = ADC_CHANNEL_8;
-   sConfig.Rank = 3;
-   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-   {
-     Error_Handler();
-   }
- 
-   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-   */
-   sConfig.Channel = ADC_CHANNEL_10;
-   sConfig.Rank = 4;
-   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-   {
-     Error_Handler();
-   }
- 
-   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-   */
-   sConfig.Channel = ADC_CHANNEL_11;
-   sConfig.Rank = 5;
-   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-   {
-     Error_Handler();
-   }
- 
-   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-   */
-   sConfig.Channel = ADC_CHANNEL_12;
-   sConfig.Rank = 6;
-   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-   {
-     Error_Handler();
-   }
- 
-   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-   */
-   sConfig.Channel = ADC_CHANNEL_13;
-   sConfig.Rank = 7;
-   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-   {
-     Error_Handler();
-   }
-   /* USER CODE BEGIN ADC3_Init 2 */
- 
-   /* USER CODE END ADC3_Init 2 */
- 
- }
- 
+static void MX_ADC3_Init(void)
+{
+
+  /* USER CODE BEGIN ADC3_Init 0 */
+
+  /* USER CODE END ADC3_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC3_Init 1 */
+
+  /* USER CODE END ADC3_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc3.Instance = ADC3;
+  hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc3.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc3.Init.ScanConvMode = ENABLE;
+  hadc3.Init.ContinuousConvMode = DISABLE;
+  hadc3.Init.DiscontinuousConvMode = ENABLE;
+  hadc3.Init.NbrOfDiscConversion = 1;
+  hadc3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc3.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc3.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc3.Init.NbrOfConversion = 7;
+  hadc3.Init.DMAContinuousRequests = DISABLE;
+  hadc3.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_10;
+  sConfig.Rank = 2;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_11;
+  sConfig.Rank = 3;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_12;
+  sConfig.Rank = 4;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_13;
+  sConfig.Rank = 5;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = 6;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Rank = 7;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC3_Init 2 */
+
+  /* USER CODE END ADC3_Init 2 */
+
+}
 
 /**
   * @brief I2C1 Initialization Function

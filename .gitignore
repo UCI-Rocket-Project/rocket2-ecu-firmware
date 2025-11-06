@@ -4,6 +4,7 @@
 .env/
 
 Core/
+CoreBak/
 Drivers/
 
 build/
