@@ -340,7 +340,17 @@ int main(void){
         float data5 = 0.00128 * ((float) adcData.pt5);
         float data6 = 0.00128 * ((float) adcData.pt6);
 
-        HAL_Delay(500);
+        //HAL_Delay(500);
+
+
+        // read thermocouples
+        TcMax31855Spi::Data tcData;
+        // (TC0 INOPERABLE)
+        // (TC1 INOPERABLE)
+        tcData = tc0.Read();
+        if (tcData.valid) {
+        float temp = tcData.tcTemperature;  // TC2 -> LOX Temperature
+        }
 
 
 //     /*Double check if this is correct*/
@@ -378,35 +388,26 @@ int main(void){
 
 //     //if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
     
-//     /* Radio */
-//     // first radio at 915 MHz
-//     if (radio._state == RadioSx127xSpi::State::IDLE || 
-//         radio._state == RadioSx127xSpi::State::TX_COMPLETE){
-//         memcpy(memoryBuffer, &data, sizeof(data));
-//         radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
-//         HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
+    /* Radio */
+    // first radio at 915 MHz
+    if (radio._state == RadioSx127xSpi::State::IDLE || 
+        radio._state == RadioSx127xSpi::State::TX_COMPLETE){
+        memcpy(memoryBuffer, &data, sizeof(data));
+        radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
+        HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
 
-// //        HAL_GPIO_TogglePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin);
-// //        HAL_GPIO_TogglePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin);
-// //        HAL_GPIO_TogglePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin);
-// //        HAL_GPIO_TogglePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin);
-
-
-//         // read thermocouples
-//         TcMax31855Spi::Data tcData;
-//         // (TC0 INOPERABLE)
-//         // (TC1 INOPERABLE)
-//         tcData = tc1.Read();
-//         if (tcData.valid) {
-//         float temp = tcData.tcTemperature;  // TC2 -> LOX Temperature
-//         }
+//        HAL_GPIO_TogglePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin);
+//        HAL_GPIO_TogglePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin);
+//        HAL_GPIO_TogglePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin);
+//        HAL_GPIO_TogglePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin);
 
 
-//     }
-//     else if (radio._state == RadioSx127xSpi::State::TX_START ||
-//         radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
-//         radio.Update();
-//     }
+
+    }
+    else if (radio._state == RadioSx127xSpi::State::TX_START ||
+        radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
+        radio.Update();
+    }
 
     /* Write to memory */
     // memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
@@ -1257,7 +1258,8 @@ static void MX_GPIO_Init(void)
                           |IMU_nCS1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, ETH_nRST_Pin|ETH_CP2_Pin|MAG_DRDY_Pin|MAG_INT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, ETH_nRST_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, ETH_CP2_Pin|MAG_DRDY_Pin|MAG_INT_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(TC0_nCS_GPIO_Port, TC0_nCS_Pin, GPIO_PIN_RESET);
