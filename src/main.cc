@@ -27,6 +27,7 @@
 
 #include "altimeter_ms5607_spi.h"
 // #include "gps_ubxm8_i2c.h"
+#include "gnss_ubloxM8_uart.h"
 #include "imu_bmi088_spi.h"
 #include "magnetometer_bmi150_i2c.h"
 #include "memory_w25q1128jv_spi.h"
@@ -69,7 +70,7 @@ struct EcuCommand {
 };
 
 struct EcuData {
-  uint8_t sync;
+  uint8_t type = 0x01;
   uint32_t timestamp;
   float packetRssi;
   float packetLoss;
@@ -155,6 +156,8 @@ SPI_HandleTypeDef hspi6;
 
 TIM_HandleTypeDef htim1;
 
+DMA_HandleTypeDef hdma_uart4_rx;
+DMA_HandleTypeDef hdma_uart4_tx;
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart3;
 
@@ -176,18 +179,12 @@ MemoryW25q1128jvSpi memory2(&hspi1, MEM2_nCS_GPIO_Port, MEM2_nCS_Pin);
 
 AltimeterMs5607Spi altimeter(&hspi4, ALT_nCS_GPIO_Port, ALT_nCS_Pin, ALT_MISO_GPIO_Port, ALT_MISO_Pin, 1014.9, 100);
 
-/////////////////////////////////////////// DO GPS LATER
-
 ImuBmi088Spi imu(&hspi6, IMU_nCS1_GPIO_Port, IMU_nCS1_Pin, IMU_nCS2_GPIO_Port, IMU_nCS2_Pin);
 
 MagBmi150i2c magnetometer(&hi2c1, MAG_INT_GPIO_Port, MAG_INT_Pin, MAG_DRDY_GPIO_Port, MAG_DRDY_Pin);
 
 // MAJOR NOTE, BAUD RATE PRESCALAR HAS TO BE SPI_BAUDRATEPRESCALER_8
-RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO_Port, 
-                      RADIO_nRST_Pin, 0x12, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 17, 
-                      RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW125KHZ, 
-                      RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
-                      8, true, 10023, 10023);
+RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO_Port, RADIO_nRST_Pin, 0x12, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 17, RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW125KHZ, RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 8, true, 10023, 10023);
 
 // RadioSx127xSpi radio1(&hspi5, RADIO1_nCS_GPIO_Port, RADIO1_nCS_Pin, RADIO1_nRST_GPIO_Port, 
 //                       RADIO1_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
@@ -201,6 +198,8 @@ RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO
 //                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
 //                       8, true, 500, 1023);
 
+GnssUbloxM8Uart gps(&huart4, 1000);
+
 // alarm- piezo buzzer 
 int alarmState; 
 
@@ -208,6 +207,9 @@ int alarmState;
 bool newCommand = false; 
 uint8_t commandBuffer[sizeof(EcuCommand)];
 EcuCommand command; 
+
+
+//uint8_t gnssBuffer[101];
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
@@ -219,6 +221,7 @@ static void MX_SPI3_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SPI5_Init(void);
 static void MX_SPI6_Init(void);
+static void MX_DMA_Init(void);
 static void MX_UART4_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_ADC3_Init(void);
@@ -234,7 +237,7 @@ int main(void){
   SystemClock_Config();
 
   MX_GPIO_Init();
-  MX_ADC1_Init();
+  //MX_ADC1_Init();
   MX_I2C1_Init();
   MX_I2C2_Init();
   MX_SPI1_Init();
@@ -242,11 +245,12 @@ int main(void){
   MX_SPI4_Init();
   MX_SPI5_Init();
   MX_SPI6_Init();
+  MX_DMA_Init();
   MX_UART4_Init();
   MX_USART3_UART_Init();
   MX_ADC3_Init();
   MX_TIM1_Init();
-  MX_ADC2_Init();
+  //MX_ADC2_Init();
   HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin, GPIO_PIN_SET);
 
   // MX_USB_DEVICE_Init();
@@ -258,9 +262,9 @@ int main(void){
 
   AltimeterMs5607Spi::Data altData;
   volatile AltimeterMs5607Spi::State altState;
-  //////////////////////////////////////  // GPS data package
   ImuBmi088Spi::Data imuData;
   MagBmi150i2c::Data magData;
+  GnssUbloxM8Uart::Data gpsData;
 
   RadioSx127xSpi::State radioState;
   //// memory init
@@ -272,6 +276,20 @@ int main(void){
   lol = altimeter.Reset();
   lol = imu.Reset();
   lol = magnetometer.Reset();
+  lol = gps.Reset();
+
+  HAL_Delay(1000);
+  
+  HAL_StatusTypeDef state3 = HAL_UART_Receive_DMA(&huart4, gps.gnssBuffer, 26);
+  
+
+  /*
+  while (1) {
+	  HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+	  HAL_Delay(1000);
+  }
+    */
+  
 
 
   // Init all of the sensors
@@ -279,10 +297,10 @@ int main(void){
   altState = altimeter.Init();
   lol = imu.Init();
   lol = magnetometer.Init();
-
+  //lol = gps.Init();
   
-
   HAL_Delay(100); // just like wait until all the sensors are all initialised
+
 
   /* Buffer variables */
 
@@ -299,34 +317,75 @@ int main(void){
   while (1){
     /*Double check if this is correct*/
     uint32_t timestamp = HAL_GetTick(); // replace later with timers 
-    data.sync = 0x01;
     data.timestamp = timestamp;
 
     
-    /* Altimeter data */
-    altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
-    if (altState == AltimeterMs5607Spi::State::COMPLETE) {
-        altData = altimeter.GetData();
-        data.temperature = altData.temperature;
-        data.altitude = altData.altitude;
-    }
+        AdcData adcData = {0};
+        uint32_t* pt_data_ptr = &adcData.pt0;
 
-    /* GPS data */
+        for (int i = 0; i < 7; i++) 
+        {
+            HAL_ADC_Start(&hadc3);
+            HAL_ADC_PollForConversion(&hadc3, 100);
+            uint32_t data = HAL_ADC_GetValue(&hadc3);
+            *(pt_data_ptr + i) = data;
+        }
 
-    /* IMU data */
-    imuData = imu.Read();
-    data.angularVelocityX = -imuData.angularVelocityX;
-    data.angularVelocityY = imuData.angularVelocityY;
-    data.angularVelocityZ = -imuData.angularVelocityZ;
-    data.accelerationX = -imuData.accelerationX;
-    data.accelerationY = imuData.accelerationY;
-    data.accelerationZ = -imuData.accelerationZ;
+        float data0 = 0.00128 * ((float) adcData.pt0);
+        float data1 = 0.00128 * ((float) adcData.pt1);
+        float data2 = 0.00128 * ((float) adcData.pt2);
+        float data3 = 0.00128 * ((float) adcData.pt3);
+        float data4 = 0.00128 * ((float) adcData.pt4);
+        float data5 = 0.00128 * ((float) adcData.pt5);
+        float data6 = 0.00128 * ((float) adcData.pt6);
 
-    /* Magnetometer data */
-    magData = magnetometer.Read();
-    data.magneticFieldX = magData.magneticFieldY;
-    data.magneticFieldY = -magData.magneticFieldX;
-    data.magneticFieldZ = magData.magneticFieldZ;
+        //HAL_Delay(500);
+
+
+        // read thermocouples
+        TcMax31855Spi::Data tcData;
+        // (TC0 INOPERABLE)
+        // (TC1 INOPERABLE)
+        tcData = tc0.Read();
+        if (tcData.valid) {
+        float temp = tcData.tcTemperature;  // TC2 -> LOX Temperature
+        }
+
+
+//     /*Double check if this is correct*/
+//     uint32_t timestamp = HAL_GetTick(); // replace later with timers 
+//     data.timestamp = timestamp;
+
+    
+//     /* Altimeter data */
+//     altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
+//     if (altState == AltimeterMs5607Spi::State::COMPLETE) {
+//         altData = altimeter.GetData();
+//         data.temperature = altData.temperature;
+//         data.altitude = altData.altitude;
+//     }
+
+//     /* GPS data */
+
+//     /* IMU data */
+//     imuData = imu.Read();
+//     data.angularVelocityX = -imuData.angularVelocityX;
+//     data.angularVelocityY = imuData.angularVelocityY;
+//     data.angularVelocityZ = -imuData.angularVelocityZ;
+//     data.accelerationX = -imuData.accelerationX;
+//     data.accelerationY = imuData.accelerationY;
+//     data.accelerationZ = -imuData.accelerationZ;
+
+//     /* Magnetometer data */
+//     magData = magnetometer.Read();
+//     data.magneticFieldX = magData.magneticFieldY;
+//     data.magneticFieldY = -magData.magneticFieldX;
+//     data.magneticFieldZ = magData.magneticFieldZ;
+
+//     /* Gps data */
+//     //bool gpsSuccess = gps.Poll(gpsData);
+
+//     //if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
     
     /* Radio */
     // first radio at 915 MHz
@@ -335,6 +394,14 @@ int main(void){
         memcpy(memoryBuffer, &data, sizeof(data));
         radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
         HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
+
+//        HAL_GPIO_TogglePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin);
+//        HAL_GPIO_TogglePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin);
+//        HAL_GPIO_TogglePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin);
+//        HAL_GPIO_TogglePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin);
+
+
+
     }
     else if (radio._state == RadioSx127xSpi::State::TX_START ||
         radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
@@ -411,13 +478,20 @@ int main(void){
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-  uint32_t crc = Crc32(commandBuffer, sizeof(EcuCommand) - 4);
+  /*uint32_t crc = Crc32(commandBuffer, sizeof(EcuCommand) - 4);
   if (crc == ((EcuCommand *)commandBuffer)->crc) {
       memcpy((uint8_t *)&command, commandBuffer, sizeof(EcuCommand));
       newCommand = true;
   }
-  HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));
+  HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));*/
+
+  __NOP();
+  if (huart->Instance == UART4)
+  {
+    gps.DMACompleteCallback();
+  }
 }
+
 
 /**
   * @brief System Clock Configuration
@@ -463,6 +537,25 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+* Enable DMA controller clock
+*/
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+
 }
 
 /**
@@ -569,6 +662,7 @@ static void MX_ADC2_Init(void)
 
 }
 
+ 
 /**
   * @brief ADC3 Initialization Function
   * @param None
@@ -590,15 +684,16 @@ static void MX_ADC3_Init(void)
   /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
   */
   hadc3.Instance = ADC3;
-  hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc3.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc3.Init.ScanConvMode = DISABLE;
+  hadc3.Init.ScanConvMode = ENABLE;
   hadc3.Init.ContinuousConvMode = DISABLE;
-  hadc3.Init.DiscontinuousConvMode = DISABLE;
+  hadc3.Init.DiscontinuousConvMode = ENABLE;
+  hadc3.Init.NbrOfDiscConversion = 1;
   hadc3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc3.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc3.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc3.Init.NbrOfConversion = 1;
+  hadc3.Init.NbrOfConversion = 7;
   hadc3.Init.DMAContinuousRequests = DISABLE;
   hadc3.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc3) != HAL_OK)
@@ -611,6 +706,60 @@ static void MX_ADC3_Init(void)
   sConfig.Channel = ADC_CHANNEL_8;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_10;
+  sConfig.Rank = 2;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_11;
+  sConfig.Rank = 3;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_12;
+  sConfig.Rank = 4;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_13;
+  sConfig.Rank = 5;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = 6;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Rank = 7;
   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -750,7 +899,7 @@ static void MX_SPI3_Init(void)
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -760,6 +909,18 @@ static void MX_SPI3_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN SPI3_Init 2 */
+   /*
+   * We must configure SPI_DIRECTION_2LINES_RXONLY in MX due to pin limitations.
+   * This has a strange implementation in ST's HAL code. See the following.
+   * https://community.st.com/s/question/0D53W00000pT7bPSAS/spi-receive-times-out-due-to-spiflagrxne-not-reseting-in-spiendrxtransaction
+   * By switching to SPI_DIRECTION_2LINES here, we can use the default HAL code without modification.
+   */
+   hspi3.Init.Direction = SPI_DIRECTION_2LINES;
+   // Optional: comment out this same code above USER CODE BEGIN SPI3_Init 2
+   if (HAL_SPI_Init(&hspi3) != HAL_OK)
+   {
+	   Error_Handler();
+   }
 
   /* USER CODE END SPI3_Init 2 */
 
@@ -816,7 +977,7 @@ static void MX_SPI5_Init(void)
   /* USER CODE END SPI5_Init 0 */
 
   /* USER CODE BEGIN SPI5_Init 1 */
-
+  
   /* USER CODE END SPI5_Init 1 */
   /* SPI5 parameter configuration*/
   hspi5.Instance = SPI5;
@@ -970,7 +1131,7 @@ static void MX_UART4_Init(void)
 
   /* USER CODE END UART4_Init 1 */
   huart4.Instance = UART4;
-  huart4.Init.BaudRate = 115200;
+  huart4.Init.BaudRate = 9600;
   huart4.Init.WordLength = UART_WORDLENGTH_8B;
   huart4.Init.StopBits = UART_STOPBITS_1;
   huart4.Init.Parity = UART_PARITY_NONE;
@@ -1096,7 +1257,8 @@ static void MX_GPIO_Init(void)
                           |IMU_nCS1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, ETH_nRST_Pin|ETH_CP2_Pin|MAG_DRDY_Pin|MAG_INT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, ETH_nRST_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, ETH_CP2_Pin|MAG_DRDY_Pin|MAG_INT_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(TC0_nCS_GPIO_Port, TC0_nCS_Pin, GPIO_PIN_RESET);

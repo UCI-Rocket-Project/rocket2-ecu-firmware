@@ -4,6 +4,8 @@
 
 #pragma pack(push, 1)
 
+// https://content.u-blox.com/sites/default/files/products/documents/u-blox8-M8_ReceiverDescrProtSpec_UBX-13003221.pdf
+
 struct UBX_ACK_NAK {
     const uint8_t packetClass = 0x05;
     const uint8_t packetId = 0x00;
@@ -124,6 +126,29 @@ struct UBX_CFG_NAV5 {
     uint16_t staticHoldMaxDist;
     uint8_t utcStandard;
     uint8_t reserved2[5] = {0};
+};
+
+// Save/reset/load settings from non-volatile memory
+struct UBX_CFG_CFG {
+    const uint8_t packetClass = 0x06;
+    const uint8_t packetId = 0x09;
+    const uint16_t payloadLength = sizeof(UBX_CFG_CFG) - 4;
+    // Mask definitions: Page 209 of proto specs (linked @ top of this file)
+    uint32_t clearMask;
+    uint32_t saveMask;
+    uint32_t loadMask;
+};
+
+struct UBX_MON_VER {
+    const uint8_t packetClass = 0x0A;
+    const uint8_t packetId = 0x04;
+    const uint16_t payloadLength = sizeof(UBX_MON_VER) - 4;
+};
+
+struct UBX_NAV_RESETODO {
+    const uint8_t packetClass = 0x01;
+    const uint8_t packetId = 0x10;
+    const uint16_t payloadLength = sizeof(UBX_MON_VER) - 4;
 };
 
 #pragma pack(pop)
