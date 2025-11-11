@@ -151,9 +151,9 @@ void Error_Handler(void);
 #define SOLENOID3_EN_GPIO_Port GPIOG
 #define ALARM_Pin GPIO_PIN_9
 #define ALARM_GPIO_Port GPIOE
-#define ETH_RX_Pin GPIO_PIN_10
+#define ETH_RX_Pin GPIO_PIN_11
 #define ETH_RX_GPIO_Port GPIOB
-#define ETH_TX_Pin GPIO_PIN_11
+#define ETH_TX_Pin GPIO_PIN_10
 #define ETH_TX_GPIO_Port GPIOB
 #define ETH_nRST_Pin GPIO_PIN_12
 #define ETH_nRST_GPIO_Port GPIOB
