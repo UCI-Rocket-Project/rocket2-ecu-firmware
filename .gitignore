@@ -6,6 +6,7 @@
 Core/
 CoreBak/
 Drivers/
+.settings
 
 build/
 

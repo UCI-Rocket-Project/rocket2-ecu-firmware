@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2025 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -37,40 +37,34 @@
 
 #include "crc.h"
 
-#define VREF 24.0             // reference voltage
-#define VFACTOR (15+100)/15   // Factor for voltage divider  
-#define ADC_MAX 4095.0        // 12-bit ADC resolution
+#define VREF 24.0               // reference voltage
+#define VFACTOR (15 + 100) / 15 // Factor for voltage divider
+#define ADC_MAX 4095.0          // 12-bit ADC resolution
 
-using namespace std; 
+using namespace std;
 
 #pragma(push, 1)
 struct AdcData {
-  uint32_t s0; 
-  uint32_t s1; 
-  uint32_t s2; 
-  uint32_t s3; 
-  uint32_t pt0; 
-  uint32_t pt1; 
-  uint32_t pt2; 
-  uint32_t pt3; 
-  uint32_t pt4; 
-  uint32_t pt5; // extra unused
-  uint32_t pt6; // extra unused
-  uint32_t supplyVoltage; 
-  uint32_t batteryVoltage; 
+  uint32_t s0;
+  uint32_t s1;
+  uint32_t s2;
+  uint32_t s3;
+  uint32_t pt0;
+  uint32_t pt1;
+  uint32_t pt2;
+  uint32_t pt3;
+  uint32_t pt4;
 };
 
 struct EcuCommand {
-  bool alarm; 
+  bool solenoidStateCopvVent;
   bool solenoidStatePv1;
   bool solenoidStatePv2;
   bool solenoidStateVent;
-  bool solenoidStateCoPvVent;
-  uint32_t crc; 
+  uint32_t crc;
 };
 
 struct EcuData {
-  uint8_t type = 0x01;
   uint32_t timestamp;
   float packetRssi;
   float packetLoss;
@@ -155,6 +149,8 @@ SPI_HandleTypeDef hspi5;
 SPI_HandleTypeDef hspi6;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim5;
 
 DMA_HandleTypeDef hdma_uart4_rx;
 DMA_HandleTypeDef hdma_uart4_tx;
@@ -169,7 +165,7 @@ int solenoidState1;
 int solenoidState2;
 int solenoidState3;
 
-// TC handlers 
+// TC handlers
 TcMax31855Spi tc0(&hspi3, TC0_nCS_GPIO_Port, TC0_nCS_Pin, 100);
 TcMax31855Spi tc1(&hspi3, TC1_nCS_GPIO_Port, TC1_nCS_Pin, 100);
 
@@ -177,39 +173,50 @@ TcMax31855Spi tc1(&hspi3, TC1_nCS_GPIO_Port, TC1_nCS_Pin, 100);
 MemoryW25q1128jvSpi memory1(&hspi1, MEM1_nCS_GPIO_Port, MEM1_nCS_Pin);
 MemoryW25q1128jvSpi memory2(&hspi1, MEM2_nCS_GPIO_Port, MEM2_nCS_Pin);
 
-AltimeterMs5607Spi altimeter(&hspi4, ALT_nCS_GPIO_Port, ALT_nCS_Pin, ALT_MISO_GPIO_Port, ALT_MISO_Pin, 1014.9, 100);
+AltimeterMs5607Spi altimeter(&hspi4, ALT_nCS_GPIO_Port, ALT_nCS_Pin,
+                             ALT_MISO_GPIO_Port, ALT_MISO_Pin, 1014.9, 100);
 
-ImuBmi088Spi imu(&hspi6, IMU_nCS1_GPIO_Port, IMU_nCS1_Pin, IMU_nCS2_GPIO_Port, IMU_nCS2_Pin);
+ImuBmi088Spi imu(&hspi6, IMU_nCS1_GPIO_Port, IMU_nCS1_Pin, IMU_nCS2_GPIO_Port,
+                 IMU_nCS2_Pin);
 
-MagBmi150i2c magnetometer(&hi2c1, MAG_INT_GPIO_Port, MAG_INT_Pin, MAG_DRDY_GPIO_Port, MAG_DRDY_Pin);
+MagBmi150i2c magnetometer(&hi2c1, MAG_INT_GPIO_Port, MAG_INT_Pin,
+                          MAG_DRDY_GPIO_Port, MAG_DRDY_Pin);
 
 // MAJOR NOTE, BAUD RATE PRESCALAR HAS TO BE SPI_BAUDRATEPRESCALER_8
 RadioSx127xSpi radio(&hspi5, RADIO_nCS_GPIO_Port, RADIO_nCS_Pin, RADIO_nRST_GPIO_Port, RADIO_nRST_Pin, 0x12, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 17, RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW125KHZ, RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 8, true, 10023, 10023);
 
-// RadioSx127xSpi radio1(&hspi5, RADIO1_nCS_GPIO_Port, RADIO1_nCS_Pin, RADIO1_nRST_GPIO_Port, 
-//                       RADIO1_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
-//                       RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW250KHZ, 
-//                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
-//                       8, true, 500, 1023);
+// RadioSx127xSpi radio1(&hspi5, RADIO1_nCS_GPIO_Port, RADIO1_nCS_Pin,
+// RADIO1_nRST_GPIO_Port,
+//                       RADIO1_nRST_Pin, 0xDA,
+//                       RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15,
+//                       RadioSx127xSpi::RampTime::RT40US,
+//                       RadioSx127xSpi::Bandwidth::BW250KHZ,
+//                       RadioSx127xSpi::CodingRate::CR45,
+//                       RadioSx127xSpi::SpreadingFactor::SF7, 8, true, 500,
+//                       1023);
 
-// RadioSx127xSpi radio2(&hspi5, RADIO2_nCS_GPIO_Port, RADIO2_nCS_Pin, RADIO2_nRST_GPIO_Port, 
-//                       RADIO2_nRST_Pin, 0xDA, RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15, 
-//                       RadioSx127xSpi::RampTime::RT40US, RadioSx127xSpi::Bandwidth::BW250KHZ, 
-//                       RadioSx127xSpi::CodingRate::CR45, RadioSx127xSpi::SpreadingFactor::SF7, 
-//                       8, true, 500, 1023);
+// RadioSx127xSpi radio2(&hspi5, RADIO2_nCS_GPIO_Port, RADIO2_nCS_Pin,
+// RADIO2_nRST_GPIO_Port,
+//                       RADIO2_nRST_Pin, 0xDA,
+//                       RadioSx127xSpi::RfPort::PA_BOOST, 915000000, 15,
+//                       RadioSx127xSpi::RampTime::RT40US,
+//                       RadioSx127xSpi::Bandwidth::BW250KHZ,
+//                       RadioSx127xSpi::CodingRate::CR45,
+//                       RadioSx127xSpi::SpreadingFactor::SF7, 8, true, 500,
+//                       1023);
 
 GnssUbloxM8Uart gps(&huart4, 1000);
 
-// alarm- piezo buzzer 
-int alarmState; 
+// alarm- piezo buzzer
+int alarmState;
 
 // incoming command
-bool newCommand = false; 
+bool newCommand = false;
 uint8_t commandBuffer[sizeof(EcuCommand)];
-EcuCommand command; 
+EcuCommand command;
 
-
-//uint8_t gnssBuffer[101];
+// uint8_t gnssBuffer[101];
+uint8_t dataBuffer[10] = {0};
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
@@ -226,18 +233,20 @@ static void MX_UART4_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_ADC3_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_TIM4_Init(void);
+static void MX_TIM5_Init(void);
 static void MX_ADC2_Init(void);
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
-int main(void){
+ * @brief  The application entry point.
+ * @retval int
+ */
+int main(void) {
   HAL_Init();
   SystemClock_Config();
 
   MX_GPIO_Init();
-  //MX_ADC1_Init();
+  MX_ADC1_Init();
   MX_I2C1_Init();
   MX_I2C2_Init();
   MX_SPI1_Init();
@@ -250,11 +259,14 @@ int main(void){
   MX_USART3_UART_Init();
   MX_ADC3_Init();
   MX_TIM1_Init();
-  //MX_ADC2_Init();
+  MX_TIM4_Init();
+  MX_TIM5_Init();
+  // MX_ADC2_Init();
   HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin, GPIO_PIN_SET);
 
   // MX_USB_DEVICE_Init();
-
+  HAL_TIM_Base_Start(&htim4);
+  HAL_TIM_Base_Start(&htim5);
 
   // Init data packages
   EcuData data;
@@ -279,28 +291,20 @@ int main(void){
   lol = gps.Reset();
 
   HAL_Delay(1000);
-  
+
   HAL_StatusTypeDef state3 = HAL_UART_Receive_DMA(&huart4, gps.gnssBuffer, 26);
-  
 
-  /*
-  while (1) {
-	  HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
-	  HAL_Delay(1000);
-  }
-    */
-  
-
+  // Listen for packets from GUI
+  HAL_UART_Receive_IT(&huart3, commandBuffer, sizeof(EcuCommand));
 
   // Init all of the sensors
   lol = radio.Init();
   altState = altimeter.Init();
   lol = imu.Init();
   lol = magnetometer.Init();
-  //lol = gps.Init();
-  
-  HAL_Delay(100); // just like wait until all the sensors are all initialised
+  // lol = gps.Init();
 
+  HAL_Delay(100); // just like wait until all the sensors are all initialised
 
   /* Buffer variables */
 
@@ -312,80 +316,140 @@ int main(void){
 
   uint32_t usbBufferTimer = HAL_GetTick();
 
-  int rssi = 0;  
+  int rssi = 0;
 
-  while (1){
-    /*Double check if this is correct*/
-    uint32_t timestamp = HAL_GetTick(); // replace later with timers 
+  while (1) {
+    HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+
+    EcuData data;
+
+    uint32_t timestamp = TIM5->CNT << 16 | TIM4->CNT;
     data.timestamp = timestamp;
 
-    
-        AdcData adcData = {0};
-        uint32_t* pt_data_ptr = &adcData.pt0;
+    // update internal states
+    if (newCommand) {
+      newCommand = false;
 
-        for (int i = 0; i < 7; i++) 
-        {
-            HAL_ADC_Start(&hadc3);
-            HAL_ADC_PollForConversion(&hadc3, 100);
-            uint32_t data = HAL_ADC_GetValue(&hadc3);
-            *(pt_data_ptr + i) = data;
-        }
+      solenoidState0 = (int)(command.solenoidStateCopvVent);
+      solenoidState1 = (int)(command.solenoidStatePv1);
+      solenoidState2 = (int)(command.solenoidStatePv2);
+      solenoidState3 = (int)(command.solenoidStateVent);
+    }
 
-        float data0 = 0.00128 * ((float) adcData.pt0);
-        float data1 = 0.00128 * ((float) adcData.pt1);
-        float data2 = 0.00128 * ((float) adcData.pt2);
-        float data3 = 0.00128 * ((float) adcData.pt3);
-        float data4 = 0.00128 * ((float) adcData.pt4);
-        float data5 = 0.00128 * ((float) adcData.pt5);
-        float data6 = 0.00128 * ((float) adcData.pt6);
+    // internal states feedback
+    data.solenoidInternalStateCopvVent = (bool)solenoidState0;
+    data.solenoidInternalStatePv1 = (bool)solenoidState1;
+    data.solenoidInternalStatePv2 = (bool)solenoidState2;
+    data.solenoidInternalStateVent = (bool)solenoidState3;
 
-        //HAL_Delay(500);
+    // switch solenoids
+    HAL_GPIO_WritePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin,
+                      (GPIO_PinState)solenoidState0);
+    HAL_GPIO_WritePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin,
+                      (GPIO_PinState)solenoidState1);
+    HAL_GPIO_WritePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin,
+                      (GPIO_PinState)solenoidState2);
+    HAL_GPIO_WritePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin,
+                      (GPIO_PinState)solenoidState3);
 
+    /*
+    // igniter
+    data.igniterArmed = (bool)HAL_GPIO_ReadPin(ARMED_GPIO_Port, ARMED_Pin);
+    data.igniter0Continuity = !(bool)HAL_GPIO_ReadPin(EMATCH0_CONT_GPIO_Port,
+    EMATCH0_CONT_Pin); data.igniter1Continuity =
+    !(bool)HAL_GPIO_ReadPin(EMATCH1_CONT_GPIO_Port, EMATCH1_CONT_Pin);
 
-        // read thermocouples
-        TcMax31855Spi::Data tcData;
-        // (TC0 INOPERABLE)
-        // (TC1 INOPERABLE)
-        tcData = tc0.Read();
-        if (tcData.valid) {
-        float temp = tcData.tcTemperature;  // TC2 -> LOX Temperature
-        }
+    if (data.igniterArmed && data.igniter0Continuity && igniterState0) {
+        HAL_GPIO_WritePin(EMATCH0_FIRE_GPIO_Port, EMATCH0_FIRE_Pin,
+    GPIO_PIN_SET); } else { HAL_GPIO_WritePin(EMATCH0_FIRE_GPIO_Port,
+    EMATCH0_FIRE_Pin, GPIO_PIN_RESET);
+    }
+    if (data.igniterArmed && data.igniter1Continuity && igniterState0) {
+        HAL_GPIO_WritePin(EMATCH1_FIRE_GPIO_Port, EMATCH1_FIRE_Pin,
+    GPIO_PIN_SET); } else { HAL_GPIO_WritePin(EMATCH1_FIRE_GPIO_Port,
+    EMATCH1_FIRE_Pin, GPIO_PIN_RESET);
+    }
 
+    // alarm
+    HAL_GPIO_WritePin(ALARM_GPIO_Port, ALARM_Pin, (GPIO_PinState)alarmState);
+    */
 
-//     /*Double check if this is correct*/
-//     uint32_t timestamp = HAL_GetTick(); // replace later with timers 
-//     data.timestamp = timestamp;
+    // ADC operations
+    AdcData adcData = {0};
 
-    
-//     /* Altimeter data */
-//     altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
-//     if (altState == AltimeterMs5607Spi::State::COMPLETE) {
-//         altData = altimeter.GetData();
-//         data.temperature = altData.temperature;
-//         data.altitude = altData.altitude;
-//     }
+    // Read PTS
+    uint32_t *adc_data_ptr = &adcData.pt0;
+    for (int i = 0; i < 5; i++) {
+      HAL_ADC_Start(&hadc3);
+      HAL_ADC_PollForConversion(&hadc3, 100);
+      uint32_t data = HAL_ADC_GetValue(&hadc3);
+      *(adc_data_ptr + i) = data;
+    }
 
-//     /* GPS data */
+    // Read solenoids
+    adc_data_ptr = &adcData.s0;
+    for (int i = 0; i < 4; i++) {
+      HAL_ADC_Start(&hadc1);
+      HAL_ADC_PollForConversion(&hadc1, 100);
+      uint32_t data = HAL_ADC_GetValue(&hadc1);
+      *(adc_data_ptr + i) = data;
+    }
 
-//     /* IMU data */
-//     imuData = imu.Read();
-//     data.angularVelocityX = -imuData.angularVelocityX;
-//     data.angularVelocityY = imuData.angularVelocityY;
-//     data.angularVelocityZ = -imuData.angularVelocityZ;
-//     data.accelerationX = -imuData.accelerationX;
-//     data.accelerationY = imuData.accelerationY;
-//     data.accelerationZ = -imuData.accelerationZ;
+    data.pressureCopv = 0.00128 * (float)adcData.pt0; // PT0 -> COPV (5000 PSI)
+    data.pressureLox =
+        0.00128 * (float)adcData.pt1; // PT1 -> Lox Tank (500 PSI)
+    data.pressureLng =
+        0.00128 * (float)adcData.pt2; // PT2 -> Lng Tank (500 PSI)
+    data.pressureInjectorLox =
+        0.00128 * (float)adcData.pt3; // PT3-> Lox Injector (500 PSI)
+    data.pressureInjectorLng =
+        0.00128 * (float)adcData.pt4; // PT4 -> Lng Injector (500 PSI)
 
-//     /* Magnetometer data */
-//     magData = magnetometer.Read();
-//     data.magneticFieldX = magData.magneticFieldY;
-//     data.magneticFieldY = -magData.magneticFieldX;
-//     data.magneticFieldZ = magData.magneticFieldZ;
+    data.solenoidCurrentCopvVent =
+        0.000817f * (float)adcData.s0;                        // S0 -> COPV Vent
+    data.solenoidCurrentPv1 = 0.000817f * (float)adcData.s1;  // S1 -> PV1
+    data.solenoidCurrentPv2 = 0.000817f * (float)adcData.s2;  // S2 -> PV2
+    data.solenoidCurrentVent = 0.000817f * (float)adcData.s3; // S3 -> Tank Vent
 
-//     /* Gps data */
-//     //bool gpsSuccess = gps.Poll(gpsData);
+    // Read TCS
+    TcMax31855Spi::Data tcData;
+    tcData = tc0.Read();
+    if (tcData.valid) {
+      data.temperatureCopv = tcData.tcTemperature;
+    } else {
+      tcData = tc1.Read();
+      if (tcData.valid) {
+        data.temperatureCopv = tcData.tcTemperature;
+      }
+    }
 
-//     //if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+    // Altimeter data
+    altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
+    if (altState == AltimeterMs5607Spi::State::COMPLETE) {
+        altData = altimeter.GetData();
+        data.temperature = altData.temperature;
+        data.altitude = altData.altitude;
+    }
+
+    // IMU data
+    imuData = imu.Read();
+    data.angularVelocityX = -imuData.angularVelocityX;
+    data.angularVelocityY = imuData.angularVelocityY;
+    data.angularVelocityZ = -imuData.angularVelocityZ;
+    data.accelerationX = -imuData.accelerationX;
+    data.accelerationY = imuData.accelerationY;
+    data.accelerationZ = -imuData.accelerationZ;
+
+    // Magnetometer data
+    magData = magnetometer.Read();
+    data.magneticFieldX = magData.magneticFieldY;
+    data.magneticFieldY = -magData.magneticFieldX;
+    data.magneticFieldZ = magData.magneticFieldZ;
+
+    // GPS data 
+    //bool gpsSuccess = gps.Poll(gpsData);
+
+    //if (gpsSuccess) HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
     
     /* Radio */
     // first radio at 915 MHz
@@ -393,22 +457,13 @@ int main(void){
         radio._state == RadioSx127xSpi::State::TX_COMPLETE){
         memcpy(memoryBuffer, &data, sizeof(data));
         radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
-        HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port,STATUS_LED_Pin);
-
-//        HAL_GPIO_TogglePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin);
-//        HAL_GPIO_TogglePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin);
-//        HAL_GPIO_TogglePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin);
-//        HAL_GPIO_TogglePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin);
-
-
-
     }
     else if (radio._state == RadioSx127xSpi::State::TX_START ||
         radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
         radio.Update();
     }
 
-    /* Write to memory */
+    // Write to memory
     // memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
     // if(memoryCounter % 2 == 0)
     // {
@@ -449,67 +504,85 @@ int main(void){
     //   }
     // }
 
-
-    // // USB
+    // USB
     // char buffer[1024] = {0};
-    // if(data.timestamp - usbBufferTimer > 500)
-    // {
-    //     sprintf(buffer,
+    // sprintf(buffer,
     //         "Timestamp: %08X\r\n"
-    //         "AngV_X: %05d, AngV_Y: %05d, AngV_Z: %05d \r\n"
-    //         "AccX: %05d, AccY: %05d, AccZ: %05d \r\n"
-    //         "MagX: %05d, MagY: %05d, MagZ: %05d \r\n"
-    //         "Temp: %05d, Alt: %09d \r\n"
-    //         "---------------------\r\n\n",
+    //         "SOLENOID\r\n"
+    //         "(1)COPV Vent: %d-%04d  (2)PV1: %d-%04d  (3)PV2: %d-%04d  (4)Tank
+    //         Vent: %d-%04d\r\n"
+    //         "\r\n"
+    //         "PRESSURE & TEMPERATURE & VOLTAGE\r\n"
+    //         "Supply: %02d  Battery: %02d  COPV Pressure: %04d  COPV
+    //         Temperature: %03d\r\n" "LOX Tank Pressure: %04d, LNG Tank
+    //         Pressure: %04d, LOX Injector Pressure: %04d, LNG Injector
+    //         Pressure: %04d\r\n"
+    //         "---------------------\r\n",
     //         (unsigned int)data.timestamp,
-    //         (int) data.angularVelocityX, (int) data.angularVelocityY, (int) data.angularVelocityZ,
-    //         (int) data.accelerationX, (int) data.accelerationY, (int) data.accelerationZ,
-    //         (int) data.temperature, (int) data.altitude);
+    //         (int)data.solenoidInternalStateCopvVent,
+    //         (int)(data.solenoidCurrentCopvVent * 1000),
+    //         (int)data.solenoidInternalStatePv1, (int)(data.solenoidCurrentPv1
+    //         * 1000), (int)data.solenoidInternalStatePv2,
+    //         (int)(data.solenoidCurrentPv2 * 1000),
+    //         (int)data.solenoidInternalStateVent,
+    //         (int)(data.solenoidCurrentVent * 1000), (int)data.supplyVoltage,
+    //         (int)data.batteryVoltage, (int)(data.pressureCopv * 1000),
+    //         (int)data.temperatureCopv, (int)(data.pressureLox * 1000),
+    //         (int)(data.pressureLng * 1000), (int)(data.pressureInjectorLox *
+    //         1000), (int)(data.pressureInjectorLng * 1000));
+    // CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
 
-    //     sprintf(buffer, "1");
-    //     CDC_Transmit_FS((uint8_t *)buffer, strlen(buffer));
+    // ethernet
+    uint32_t crc = Crc32((uint8_t *)&data, sizeof(EcuData) - 4);
+    data.crc = crc;
+    HAL_StatusTypeDef stat =
+        HAL_UART_Transmit(&huart3, (uint8_t *)&data, sizeof(EcuData), 100);
 
-    //     //update buffer timer
-    //     usbBufferTimer = data.timestamp;
-
-    //     HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
-    // }
+    // loop time control (the timestamp rolls over after 49 hours, should be ok)
+    while ((TIM5->CNT << 16 | TIM4->CNT) - timestamp < 100) {
+    }
   }
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-  /*uint32_t crc = Crc32(commandBuffer, sizeof(EcuCommand) - 4);
-  if (crc == ((EcuCommand *)commandBuffer)->crc) {
+  if (huart->Instance == UART4) {
+    // This is the GPS logic from ecubare.cc
+    gps.DMACompleteCallback();
+  }
+
+  if (huart->Instance == USART3) {
+    // This is the command logic from main.cc
+    uint32_t crc = Crc32(commandBuffer, sizeof(EcuCommand) - 4);
+    if (crc == ((EcuCommand *)commandBuffer)->crc) {
       memcpy((uint8_t *)&command, commandBuffer, sizeof(EcuCommand));
       newCommand = true;
-  }
-  HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));*/
-
-  __NOP();
-  if (huart->Instance == UART4)
-  {
-    gps.DMACompleteCallback();
+    }
+    // Re-arm the interrupt for huart3
+    HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));
+    /*
+    uint8_t dataTransmit[4] = {'r', 'e', 'z', 'q'};
+    HAL_UART_Transmit(&huart3, dataTransmit, sizeof(uint8_t) * 4, 2000);
+    HAL_UART_Receive_IT(&huart3, dataBuffer, 10);
+    */
   }
 }
 
-
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
-void SystemClock_Config(void)
-{
+ * @brief System Clock Configuration
+ * @retval None
+ */
+void SystemClock_Config(void) {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-  */
+   */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
+   * in the RCC_OscInitTypeDef structure.
+   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -519,31 +592,28 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 7;
   RCC_OscInitStruct.PLL.PLLR = 2;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
     Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+   */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
+                                RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
-  {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) {
     Error_Handler();
   }
 }
 
 /**
-* Enable DMA controller clock
-*/
-static void MX_DMA_Init(void)
-{
+ * Enable DMA controller clock
+ */
+static void MX_DMA_Init(void) {
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
@@ -555,16 +625,14 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream4_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
-
 }
 
 /**
-  * @brief ADC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC1_Init(void)
-{
+ * @brief ADC1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_ADC1_Init(void) {
 
   /* USER CODE BEGIN ADC1_Init 0 */
 
@@ -576,47 +644,73 @@ static void MX_ADC1_Init(void)
 
   /* USER CODE END ADC1_Init 1 */
 
-  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
-  */
+  /** Configure the global features of the ADC (Clock, Resolution, Data
+   * Alignment and number of conversion)
+   */
   hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ScanConvMode = ENABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = ENABLE;
+  hadc1.Init.NbrOfDiscConversion = 1;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.NbrOfConversion = 4;
   hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
-  {
+  if (HAL_ADC_Init(&hadc1) != HAL_OK) {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-  sConfig.Channel = ADC_CHANNEL_3;
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
+  sConfig.Channel = ADC_CHANNEL_14;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
+  sConfig.Channel = ADC_CHANNEL_15;
+  sConfig.Rank = 2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = 3;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
+  sConfig.Channel = ADC_CHANNEL_9;
+  sConfig.Rank = 4;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
-
 }
 
 /**
-  * @brief ADC2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC2_Init(void)
-{
+ * @brief ADC2 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_ADC2_Init(void) {
 
   /* USER CODE BEGIN ADC2_Init 0 */
 
@@ -628,8 +722,9 @@ static void MX_ADC2_Init(void)
 
   /* USER CODE END ADC2_Init 1 */
 
-  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
-  */
+  /** Configure the global features of the ADC (Clock, Resolution, Data
+   * Alignment and number of conversion)
+   */
   hadc2.Instance = ADC2;
   hadc2.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
   hadc2.Init.Resolution = ADC_RESOLUTION_12B;
@@ -642,34 +737,30 @@ static void MX_ADC2_Init(void)
   hadc2.Init.NbrOfConversion = 1;
   hadc2.Init.DMAContinuousRequests = DISABLE;
   hadc2.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  if (HAL_ADC_Init(&hadc2) != HAL_OK)
-  {
+  if (HAL_ADC_Init(&hadc2) != HAL_OK) {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
   sConfig.Channel = ADC_CHANNEL_2;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
-  {
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN ADC2_Init 2 */
 
   /* USER CODE END ADC2_Init 2 */
-
 }
 
- 
 /**
-  * @brief ADC3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC3_Init(void)
-{
+ * @brief ADC3 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_ADC3_Init(void) {
 
   /* USER CODE BEGIN ADC3_Init 0 */
 
@@ -681,8 +772,9 @@ static void MX_ADC3_Init(void)
 
   /* USER CODE END ADC3_Init 1 */
 
-  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
-  */
+  /** Configure the global features of the ADC (Clock, Resolution, Data
+   * Alignment and number of conversion)
+   */
   hadc3.Instance = ADC3;
   hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc3.Init.Resolution = ADC_RESOLUTION_12B;
@@ -696,87 +788,84 @@ static void MX_ADC3_Init(void)
   hadc3.Init.NbrOfConversion = 7;
   hadc3.Init.DMAContinuousRequests = DISABLE;
   hadc3.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  if (HAL_ADC_Init(&hadc3) != HAL_OK)
-  {
+  if (HAL_ADC_Init(&hadc3) != HAL_OK) {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
   sConfig.Channel = ADC_CHANNEL_8;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-  {
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
   sConfig.Channel = ADC_CHANNEL_10;
   sConfig.Rank = 2;
-  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-  {
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
   sConfig.Channel = ADC_CHANNEL_11;
   sConfig.Rank = 3;
-  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-  {
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
   sConfig.Channel = ADC_CHANNEL_12;
   sConfig.Rank = 4;
-  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-  {
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
   sConfig.Channel = ADC_CHANNEL_13;
   sConfig.Rank = 5;
-  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-  {
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
   sConfig.Channel = ADC_CHANNEL_2;
   sConfig.Rank = 6;
-  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-  {
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
+  /** Configure for the selected ADC regular channel its corresponding rank in
+   * the sequencer and its sample time.
+   */
   sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = 7;
-  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
-  {
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN ADC3_Init 2 */
 
   /* USER CODE END ADC3_Init 2 */
-
 }
 
 /**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C1_Init(void)
-{
+ * @brief I2C1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_I2C1_Init(void) {
 
   /* USER CODE BEGIN I2C1_Init 0 */
 
@@ -794,23 +883,20 @@ static void MX_I2C1_Init(void)
   hi2c1.Init.OwnAddress2 = 0;
   hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
   hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-  {
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
-
 }
 
 /**
-  * @brief I2C2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C2_Init(void)
-{
+ * @brief I2C2 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_I2C2_Init(void) {
 
   /* USER CODE BEGIN I2C2_Init 0 */
 
@@ -828,23 +914,20 @@ static void MX_I2C2_Init(void)
   hi2c2.Init.OwnAddress2 = 0;
   hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
   hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
-  {
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN I2C2_Init 2 */
 
   /* USER CODE END I2C2_Init 2 */
-
 }
 
 /**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI1_Init(void)
-{
+ * @brief SPI1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_SPI1_Init(void) {
 
   /* USER CODE BEGIN SPI1_Init 0 */
 
@@ -866,23 +949,20 @@ static void MX_SPI1_Init(void)
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
+  if (HAL_SPI_Init(&hspi1) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
-
 }
 
 /**
-  * @brief SPI3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI3_Init(void)
-{
+ * @brief SPI3 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_SPI3_Init(void) {
 
   /* USER CODE BEGIN SPI3_Init 0 */
 
@@ -904,35 +984,32 @@ static void MX_SPI3_Init(void)
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi3.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi3) != HAL_OK)
-  {
+  if (HAL_SPI_Init(&hspi3) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN SPI3_Init 2 */
-   /*
+  /*
    * We must configure SPI_DIRECTION_2LINES_RXONLY in MX due to pin limitations.
    * This has a strange implementation in ST's HAL code. See the following.
    * https://community.st.com/s/question/0D53W00000pT7bPSAS/spi-receive-times-out-due-to-spiflagrxne-not-reseting-in-spiendrxtransaction
-   * By switching to SPI_DIRECTION_2LINES here, we can use the default HAL code without modification.
+   * By switching to SPI_DIRECTION_2LINES here, we can use the default HAL code
+   * without modification.
    */
-   hspi3.Init.Direction = SPI_DIRECTION_2LINES;
-   // Optional: comment out this same code above USER CODE BEGIN SPI3_Init 2
-   if (HAL_SPI_Init(&hspi3) != HAL_OK)
-   {
-	   Error_Handler();
-   }
+  hspi3.Init.Direction = SPI_DIRECTION_2LINES;
+  // Optional: comment out this same code above USER CODE BEGIN SPI3_Init 2
+  if (HAL_SPI_Init(&hspi3) != HAL_OK) {
+    Error_Handler();
+  }
 
   /* USER CODE END SPI3_Init 2 */
-
 }
 
 /**
-  * @brief SPI4 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI4_Init(void)
-{
+ * @brief SPI4 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_SPI4_Init(void) {
 
   /* USER CODE BEGIN SPI4_Init 0 */
 
@@ -954,30 +1031,27 @@ static void MX_SPI4_Init(void)
   hspi4.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi4.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi4.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi4) != HAL_OK)
-  {
+  if (HAL_SPI_Init(&hspi4) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN SPI4_Init 2 */
 
   /* USER CODE END SPI4_Init 2 */
-
 }
 
 /**
-  * @brief SPI5 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI5_Init(void)
-{
+ * @brief SPI5 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_SPI5_Init(void) {
 
   /* USER CODE BEGIN SPI5_Init 0 */
 
   /* USER CODE END SPI5_Init 0 */
 
   /* USER CODE BEGIN SPI5_Init 1 */
-  
+
   /* USER CODE END SPI5_Init 1 */
   /* SPI5 parameter configuration*/
   hspi5.Instance = SPI5;
@@ -992,23 +1066,20 @@ static void MX_SPI5_Init(void)
   hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi5.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi5) != HAL_OK)
-  {
+  if (HAL_SPI_Init(&hspi5) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN SPI5_Init 2 */
 
   /* USER CODE END SPI5_Init 2 */
-
 }
 
 /**
-  * @brief SPI6 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI6_Init(void)
-{
+ * @brief SPI6 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_SPI6_Init(void) {
 
   /* USER CODE BEGIN SPI6_Init 0 */
 
@@ -1030,23 +1101,20 @@ static void MX_SPI6_Init(void)
   hspi6.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi6.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi6.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi6) != HAL_OK)
-  {
+  if (HAL_SPI_Init(&hspi6) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN SPI6_Init 2 */
 
   /* USER CODE END SPI6_Init 2 */
-
 }
 
 /**
-  * @brief TIM1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM1_Init(void)
-{
+ * @brief TIM1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_TIM1_Init(void) {
 
   /* USER CODE BEGIN TIM1_Init 0 */
 
@@ -1067,23 +1135,19 @@ static void MX_TIM1_Init(void)
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
-  {
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK) {
     Error_Handler();
   }
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
-  {
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK) {
     Error_Handler();
   }
-  if (HAL_TIM_OC_Init(&htim1) != HAL_OK)
-  {
+  if (HAL_TIM_OC_Init(&htim1) != HAL_OK) {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
-  {
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK) {
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_TIMING;
@@ -1093,8 +1157,7 @@ static void MX_TIM1_Init(void)
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
   sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
-  if (HAL_TIM_OC_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
+  if (HAL_TIM_OC_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK) {
     Error_Handler();
   }
   sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
@@ -1104,24 +1167,70 @@ static void MX_TIM1_Init(void)
   sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
   sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
   sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
-  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
-  {
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN TIM1_Init 2 */
 
   /* USER CODE END TIM1_Init 2 */
   HAL_TIM_MspPostInit(&htim1);
+}
 
+static void MX_TIM4_Init(void) {
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 36000;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 65535;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV2;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK) {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK) {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK) {
+    Error_Handler();
+  }
+}
+
+static void MX_TIM5_Init(void) {
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 0;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = 65535;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK) {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_EXTERNAL1;
+  sSlaveConfig.InputTrigger = TIM_TS_ITR2;
+  if (HAL_TIM_SlaveConfigSynchro(&htim5, &sSlaveConfig) != HAL_OK) {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK) {
+    Error_Handler();
+  }
 }
 
 /**
-  * @brief UART4 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_UART4_Init(void)
-{
+ * @brief UART4 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_UART4_Init(void) {
 
   /* USER CODE BEGIN UART4_Init 0 */
 
@@ -1138,23 +1247,20 @@ static void MX_UART4_Init(void)
   huart4.Init.Mode = UART_MODE_TX_RX;
   huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart4.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart4) != HAL_OK)
-  {
+  if (HAL_UART_Init(&huart4) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN UART4_Init 2 */
 
   /* USER CODE END UART4_Init 2 */
-
 }
 
 /**
-  * @brief USART3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART3_UART_Init(void)
-{
+ * @brief USART3 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_USART3_UART_Init(void) {
 
   /* USER CODE BEGIN USART3_Init 0 */
 
@@ -1169,16 +1275,14 @@ static void MX_USART3_UART_Init(void)
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
   huart3.Init.Mode = UART_MODE_TX_RX;
-  huart3.Init.HwFlowCtl = UART_HWCONTROL_RTS_CTS;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart3.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart3) != HAL_OK)
-  {
+  if (HAL_UART_Init(&huart3) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN USART3_Init 2 */
 
   /* USER CODE END USART3_Init 2 */
-
 }
 
 // /**
@@ -1217,15 +1321,14 @@ static void MX_USART3_UART_Init(void)
 // }
 
 /**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_GPIO_Init(void)
-{
+ * @brief GPIO Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_GPIO_Init(void) {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+  /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOE_CLK_ENABLE();
@@ -1245,26 +1348,34 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(RADIO_nRST_GPIO_Port, RADIO_nRST_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOF, RADIO_DIO1_Pin|RADIO_DIO0_Pin|RADIO1_DIO1_Pin|RADIO1_nCS_Pin
-                          |RADIO1_nRST_Pin|RADIO_nCS_Pin|MEM1_nCS_Pin|SOLENOID0_EN_Pin
-                          |SOLENOID1_EN_Pin|SOLENOID2_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF,
+                    RADIO_DIO1_Pin | RADIO_DIO0_Pin | RADIO1_DIO1_Pin |
+                        RADIO1_nCS_Pin | RADIO1_nRST_Pin | RADIO_nCS_Pin |
+                        MEM1_nCS_Pin | SOLENOID0_EN_Pin | SOLENOID1_EN_Pin |
+                        SOLENOID2_EN_Pin,
+                    GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOH, GPS_INT_Pin|MEM2_nCS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOH, GPS_INT_Pin | MEM2_nCS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOG, SOLENOID3_EN_Pin|STATUS_LED_Pin|IMU_INT2_Pin|IMU_nCS2_Pin
-                          |IMU_nCS1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOG,
+                    SOLENOID3_EN_Pin | STATUS_LED_Pin | IMU_INT2_Pin |
+                        IMU_nCS2_Pin | IMU_nCS1_Pin,
+                    GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, ETH_nRST_Pin, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(GPIOB, ETH_CP2_Pin|MAG_DRDY_Pin|MAG_INT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, ETH_CP2_Pin | MAG_DRDY_Pin | MAG_INT_Pin,
+                    GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(TC0_nCS_GPIO_Port, TC0_nCS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, TC1_nCS_Pin|IMU_INT4_Pin|IMU_INT3_Pin|IMU_INT1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD,
+                    TC1_nCS_Pin | IMU_INT4_Pin | IMU_INT3_Pin | IMU_INT1_Pin,
+                    GPIO_PIN_RESET);
 
   /*Configure GPIO pin : ALT_nCS_Pin */
   GPIO_InitStruct.Pin = ALT_nCS_Pin;
@@ -1274,13 +1385,13 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(ALT_nCS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : RADIO2_nRST_Pin RADIO2_nCS_Pin */
-  GPIO_InitStruct.Pin = RADIO2_nRST_Pin|RADIO2_nCS_Pin;
+  GPIO_InitStruct.Pin = RADIO2_nRST_Pin | RADIO2_nCS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : RADIO2_DIO1_Pin RADIO2_DIO0_Pin */
-  GPIO_InitStruct.Pin = RADIO2_DIO1_Pin|RADIO2_DIO0_Pin;
+  GPIO_InitStruct.Pin = RADIO2_DIO1_Pin | RADIO2_DIO0_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
@@ -1292,35 +1403,36 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(RADIO_nRST_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : RADIO_DIO1_Pin RADIO_DIO0_Pin RADIO1_DIO1_Pin RADIO1_nCS_Pin
-                           RADIO1_nRST_Pin RADIO_nCS_Pin MEM1_nCS_Pin SOLENOID0_EN_Pin
+  /*Configure GPIO pins : RADIO_DIO1_Pin RADIO_DIO0_Pin RADIO1_DIO1_Pin
+     RADIO1_nCS_Pin RADIO1_nRST_Pin RADIO_nCS_Pin MEM1_nCS_Pin SOLENOID0_EN_Pin
                            SOLENOID1_EN_Pin SOLENOID2_EN_Pin */
-  GPIO_InitStruct.Pin = RADIO_DIO1_Pin|RADIO_DIO0_Pin|RADIO1_DIO1_Pin|RADIO1_nCS_Pin
-                          |RADIO1_nRST_Pin|RADIO_nCS_Pin|MEM1_nCS_Pin|SOLENOID0_EN_Pin
-                          |SOLENOID1_EN_Pin|SOLENOID2_EN_Pin;
+  GPIO_InitStruct.Pin = RADIO_DIO1_Pin | RADIO_DIO0_Pin | RADIO1_DIO1_Pin |
+                        RADIO1_nCS_Pin | RADIO1_nRST_Pin | RADIO_nCS_Pin |
+                        MEM1_nCS_Pin | SOLENOID0_EN_Pin | SOLENOID1_EN_Pin |
+                        SOLENOID2_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
   /*Configure GPIO pins : GPS_INT_Pin MEM_nCS_Pin */
-  GPIO_InitStruct.Pin = GPS_INT_Pin|MEM2_nCS_Pin;
+  GPIO_InitStruct.Pin = GPS_INT_Pin | MEM2_nCS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SOLENOID3_EN_Pin STATUS_LED_Pin IMU_INT2_Pin IMU_nCS2_Pin
-                           IMU_nCS1_Pin */
-  GPIO_InitStruct.Pin = SOLENOID3_EN_Pin|STATUS_LED_Pin|IMU_INT2_Pin|IMU_nCS2_Pin
-                          |IMU_nCS1_Pin;
+  /*Configure GPIO pins : SOLENOID3_EN_Pin STATUS_LED_Pin IMU_INT2_Pin
+     IMU_nCS2_Pin IMU_nCS1_Pin */
+  GPIO_InitStruct.Pin = SOLENOID3_EN_Pin | STATUS_LED_Pin | IMU_INT2_Pin |
+                        IMU_nCS2_Pin | IMU_nCS1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
   /*Configure GPIO pins : ETH_nRST_Pin ETH_CP2_Pin MAG_DRDY_Pin MAG_INT_Pin */
-  GPIO_InitStruct.Pin = ETH_nRST_Pin|ETH_CP2_Pin|MAG_DRDY_Pin|MAG_INT_Pin;
+  GPIO_InitStruct.Pin = ETH_nRST_Pin | ETH_CP2_Pin | MAG_DRDY_Pin | MAG_INT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -1334,14 +1446,15 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(TC0_nCS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : TC1_nCS_Pin IMU_INT4_Pin IMU_INT3_Pin IMU_INT1_Pin */
-  GPIO_InitStruct.Pin = TC1_nCS_Pin|IMU_INT4_Pin|IMU_INT3_Pin|IMU_INT1_Pin;
+  GPIO_InitStruct.Pin =
+      TC1_nCS_Pin | IMU_INT4_Pin | IMU_INT3_Pin | IMU_INT1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+  /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -1349,33 +1462,31 @@ static void MX_GPIO_Init(void)
 /* USER CODE END 4 */
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
-void Error_Handler(void)
-{
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
+void Error_Handler(void) {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
-  while (1)
-  {
+  while (1) {
   }
   /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t *file, uint32_t line)
-{
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
+void assert_failed(uint8_t *file, uint32_t line) {
   /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* User can add his own implementation to report the file name and line
+     number, e.g.: printf("Wrong parameters value: file %s on line %d\r\n",
+     file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
