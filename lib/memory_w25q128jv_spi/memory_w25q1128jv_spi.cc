@@ -1,7 +1,6 @@
 #include <memory_w25q1128jv_spi.h>
 
 MemoryW25q1128jvSpi::MemoryW25q1128jvSpi(SPI_HandleTypeDef *hspi, GPIO_TypeDef *csPort, uint16_t csPin)
-
     : _hspi(hspi), _csPort(csPort), _csPin(csPin) {}
 
 /* Notes */
@@ -159,6 +158,68 @@ MemoryW25q1128jvSpi::State MemoryW25q1128jvSpi::ChipWrite(uint8_t (&data)[64]) {
             break;
     }
     return _state;
+}
+
+MemoryW25q1128jvSpi::State MemoryW25q1128jvSpi::ChipWriteTimeout(uint8_t (&data)[64]) {
+  const unsigned int MAX_ITERATIONS = 10000;
+  unsigned int iterations = 0;
+  MemoryW25q1128jvSpi::State state;
+
+  do {
+      state = ChipWrite(data);
+      iterations++;
+      if (iterations >= MAX_ITERATIONS) {
+          return State::ERROR;  // Timeout
+      }
+  } while (state != State::COMPLETE && state != State::ERROR);
+
+  return state;
+}
+
+MemoryW25q1128jvSpi::WriteStatus MemoryW25q1128jvSpi::ChipWrite(uint8_t *data, size_t dataLen) {
+  size_t remainingBuffLen = _dataWriteBuffer.size();
+  size_t buffFillLen = 64 - remainingBuffLen;
+
+  if (buffFillLen > dataLen) {
+    _dataWriteBuffer.insert(_dataWriteBuffer.end(), data, data + dataLen);
+    return MemoryW25q1128jvSpi::WriteStatus::BUFFERED;
+  }
+
+  // Fill buffer, write to flash, and empty
+  _dataWriteBuffer.insert(_dataWriteBuffer.end(), data, data + buffFillLen);
+  if (_dataWriteBuffer.size() != 64) {
+    // This shouldn't be possible but I may be really stupid and maybe it is possible so let's hope this branch isn't ever reachable !!!
+    return MemoryW25q1128jvSpi::WriteStatus::ERROR;
+  }
+  State result = ChipWriteTimeout(*reinterpret_cast<uint8_t(*)[64]>(_dataWriteBuffer.data()));
+  if (result == State::ERROR) {
+      return MemoryW25q1128jvSpi::WriteStatus::ERROR;
+  }
+  _dataWriteBuffer.clear();
+
+  size_t dataLenPostFill = dataLen - buffFillLen;
+
+  // Write remaining complete 64 byte chunks to memory
+  unsigned int containers = dataLenPostFill / 64;
+  for (unsigned int container = 0; container < containers; container++) {
+    size_t buffOffset = container * 64;
+    uint8_t* dataStartOffset = data + buffFillLen + buffOffset;
+    State result = ChipWriteTimeout(*reinterpret_cast<uint8_t(*)[64]>(dataStartOffset));
+    if (result == State::ERROR) {
+        return MemoryW25q1128jvSpi::WriteStatus::ERROR;
+    }
+  }
+
+  // Store remainder in data write buffer
+  size_t remainder = dataLenPostFill % 64;
+
+  if (remainder == 0) {
+    return MemoryW25q1128jvSpi::WriteStatus::FULLY_WRITTEN;
+  }
+
+   _dataWriteBuffer.insert(_dataWriteBuffer.end(), data + dataLen - remainder, data + dataLen); 
+  
+  return MemoryW25q1128jvSpi::WriteStatus::PARTIALLY_WRITTEN;
 }
 
 int MemoryW25q1128jvSpi::ChipRead(uint32_t readAddress, uint8_t (&chipData)[64]) {

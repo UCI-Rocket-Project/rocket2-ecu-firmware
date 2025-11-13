@@ -319,7 +319,6 @@ int main(void) {
   int rssi = 0;
 
   while (1) {
-    HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
 
     EcuData data;
 
@@ -329,6 +328,7 @@ int main(void) {
     // update internal states
     if (newCommand) {
       newCommand = false;
+    HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
 
       solenoidState0 = (int)(command.solenoidStateCopvVent);
       solenoidState1 = (int)(command.solenoidStatePv1);
@@ -464,6 +464,23 @@ int main(void) {
     }
 
     // Write to memory
+    /*
+    144 - 64 - 64 = 144 - 128 = 16
+    
+    containers = 144 / SIZE = 2
+    WRITE x2
+    remaining = 144 % SIZE = 16
+    fill = SIZE - remaining = 64 - 16 = 48
+
+
+    WRITE remaining + fill
+    data_size = 144 - fill = 96
+    containers = data_size / SIZE = 96 / 64 = 1
+    WRITE x1
+    remaining = data_size % SIZE = 32
+    fill = SIZE - remaining = 64 - 32 = 32 
+    */
+    
     // memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
     // if(memoryCounter % 2 == 0)
     // {
@@ -539,7 +556,7 @@ int main(void) {
         HAL_UART_Transmit(&huart3, (uint8_t *)&data, sizeof(EcuData), 100);
 
     // loop time control (the timestamp rolls over after 49 hours, should be ok)
-    while ((TIM5->CNT << 16 | TIM4->CNT) - timestamp < 100) {
+    while ((TIM5->CNT << 16 | TIM4->CNT) - timestamp < 1000) {
     }
   }
 }
@@ -558,7 +575,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
       newCommand = true;
     }
     // Re-arm the interrupt for huart3
-    HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));
+    HAL_UART_Receive_IT(&huart3, commandBuffer, sizeof(EcuCommand));
     /*
     uint8_t dataTransmit[4] = {'r', 'e', 'z', 'q'};
     HAL_UART_Transmit(&huart3, dataTransmit, sizeof(uint8_t) * 4, 2000);

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cmath>
+#include <vector>
 
 #if defined(STM32F1)
 #include "stm32f4xx_hal.h"
@@ -29,6 +30,14 @@ class MemoryW25q1128jvSpi {
         PAGE_WRITE,
         COMPLETE,
         ERROR
+    };
+
+    enum class WriteStatus
+    {
+      FULLY_WRITTEN,
+      PARTIALLY_WRITTEN,
+      BUFFERED,
+      ERROR
     };
 
     /**
@@ -79,6 +88,19 @@ class MemoryW25q1128jvSpi {
      * @retval Operation FSM status
      */
     State ChipWrite(uint8_t (&data)[64]);
+
+    /**
+     * @brief Repeatedly calls ChipWrite till data has been written
+     * @retval Operation FSM status
+     */
+    State ChipWriteTimeout(uint8_t (&data)[64]);
+
+    /**
+     * @brief Writes arbitrarily sized byte array into flasg memory,
+     *        Auto increments from address found in Init. Writes are buffered into 64 byte blocks.
+     * @retval Operation FSM status
+     */
+    WriteStatus ChipWrite(uint8_t *data, size_t dataLen);
 
     /**
      * @brief Reads 64 bytes starting from read_address input,
@@ -196,4 +218,6 @@ class MemoryW25q1128jvSpi {
     State _state = State::CHIP_ENABLE;
 
     uint32_t address = 0;
+
+    std::vector<uint8_t> _dataWriteBuffer;
 };
