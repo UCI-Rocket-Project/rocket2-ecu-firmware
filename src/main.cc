@@ -270,38 +270,38 @@ int main(void) {
 
   // Init data packages
   EcuData data;
-  ecuFluidSystemData fluidSystemData;
+  // ecuFluidSystemData fluidSystemData;
 
-  AltimeterMs5607Spi::Data altData;
-  volatile AltimeterMs5607Spi::State altState;
-  ImuBmi088Spi::Data imuData;
-  MagBmi150i2c::Data magData;
-  GnssUbloxM8Uart::Data gpsData;
+  // AltimeterMs5607Spi::Data altData;
+  // volatile AltimeterMs5607Spi::State altState;
+  // ImuBmi088Spi::Data imuData;
+  // MagBmi150i2c::Data magData;
+  // GnssUbloxM8Uart::Data gpsData;
 
-  RadioSx127xSpi::State radioState;
+  // RadioSx127xSpi::State radioState;
   //// memory init
 
-  volatile int lol; // for testing, lol
+  // volatile int lol; // for testing, lol
 
   /* Reset all of the senesors before init*/
-  lol = radio.Reset();
-  lol = altimeter.Reset();
-  lol = imu.Reset();
-  lol = magnetometer.Reset();
-  lol = gps.Reset();
+  // lol = radio.Reset();
+  // lol = altimeter.Reset();
+  // lol = imu.Reset();
+  // lol = magnetometer.Reset();
+  // lol = gps.Reset();
 
-  HAL_Delay(1000);
+  // HAL_Delay(1000);
 
-  HAL_StatusTypeDef state3 = HAL_UART_Receive_DMA(&huart4, gps.gnssBuffer, 26);
+  // HAL_StatusTypeDef state3 = HAL_UART_Receive_DMA(&huart4, gps.gnssBuffer, 26);
 
   // Listen for packets from GUI
-  HAL_UART_Receive_IT(&huart3, commandBuffer, sizeof(EcuCommand));
+  // HAL_UART_Receive_IT(&huart3, commandBuffer, sizeof(EcuCommand));
 
   // Init all of the sensors
-  lol = radio.Init();
-  altState = altimeter.Init();
-  lol = imu.Init();
-  lol = magnetometer.Init();
+  // lol = radio.Init();
+  // altState = altimeter.Init();
+  // lol = imu.Init();
+  // lol = magnetometer.Init();
   // lol = gps.Init();
 
   HAL_Delay(100); // just like wait until all the sensors are all initialised
@@ -310,13 +310,13 @@ int main(void) {
 
   // Memory oscillates between writing between the 2 modules
   // Counter for memory write
-  int memoryCounter = 0;
+  // int memoryCounter = 0;
 
-  uint8_t memoryBuffer[sizeof(data)];
+  // uint8_t memoryBuffer[sizeof(data)];
 
-  uint32_t usbBufferTimer = HAL_GetTick();
+  // uint32_t usbBufferTimer = HAL_GetTick();
 
-  int rssi = 0;
+  // int rssi = 0;
 
   while (1) {
     HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
@@ -327,30 +327,30 @@ int main(void) {
     data.timestamp = timestamp;
 
     // update internal states
-    if (newCommand) {
-      newCommand = false;
+    // if (newCommand) {
+    //   newCommand = false;
 
-      solenoidState0 = (int)(command.solenoidStateCopvVent);
-      solenoidState1 = (int)(command.solenoidStatePv1);
-      solenoidState2 = (int)(command.solenoidStatePv2);
-      solenoidState3 = (int)(command.solenoidStateVent);
-    }
+    //   solenoidState0 = (int)(command.solenoidStateCopvVent);
+    //   solenoidState1 = (int)(command.solenoidStatePv1);
+    //   solenoidState2 = (int)(command.solenoidStatePv2);
+    //   solenoidState3 = (int)(command.solenoidStateVent);
+    // }
 
     // internal states feedback
-    data.solenoidInternalStateCopvVent = (bool)solenoidState0;
-    data.solenoidInternalStatePv1 = (bool)solenoidState1;
-    data.solenoidInternalStatePv2 = (bool)solenoidState2;
-    data.solenoidInternalStateVent = (bool)solenoidState3;
+    // data.solenoidInternalStateCopvVent = (bool)solenoidState0;
+    // data.solenoidInternalStatePv1 = (bool)solenoidState1;
+    // data.solenoidInternalStatePv2 = (bool)solenoidState2;
+    // data.solenoidInternalStateVent = (bool)solenoidState3;
 
     // switch solenoids
-    HAL_GPIO_WritePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin,
-                      (GPIO_PinState)solenoidState0);
-    HAL_GPIO_WritePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin,
-                      (GPIO_PinState)solenoidState1);
-    HAL_GPIO_WritePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin,
-                      (GPIO_PinState)solenoidState2);
-    HAL_GPIO_WritePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin,
-                      (GPIO_PinState)solenoidState3);
+    // HAL_GPIO_WritePin(SOLENOID0_EN_GPIO_Port, SOLENOID0_EN_Pin,
+    //                   (GPIO_PinState)solenoidState0);
+    // HAL_GPIO_WritePin(SOLENOID1_EN_GPIO_Port, SOLENOID1_EN_Pin,
+    //                   (GPIO_PinState)solenoidState1);
+    // HAL_GPIO_WritePin(SOLENOID2_EN_GPIO_Port, SOLENOID2_EN_Pin,
+    //                   (GPIO_PinState)solenoidState2);
+    // HAL_GPIO_WritePin(SOLENOID3_EN_GPIO_Port, SOLENOID3_EN_Pin,
+    //                   (GPIO_PinState)solenoidState3);
 
     /*
     // igniter
@@ -387,64 +387,60 @@ int main(void) {
     }
 
     // Read solenoids
-    adc_data_ptr = &adcData.s0;
-    for (int i = 0; i < 4; i++) {
-      HAL_ADC_Start(&hadc1);
-      HAL_ADC_PollForConversion(&hadc1, 100);
-      uint32_t data = HAL_ADC_GetValue(&hadc1);
-      *(adc_data_ptr + i) = data;
-    }
+    // adc_data_ptr = &adcData.s0;
+    // for (int i = 0; i < 4; i++) {
+    //   HAL_ADC_Start(&hadc1);
+    //   HAL_ADC_PollForConversion(&hadc1, 100);
+    //   uint32_t data = HAL_ADC_GetValue(&hadc1);
+    //   *(adc_data_ptr + i) = data;
+    // }
 
     data.pressureCopv = 0.00128 * (float)adcData.pt0; // PT0 -> COPV (5000 PSI)
-    data.pressureLox =
-        0.00128 * (float)adcData.pt1; // PT1 -> Lox Tank (500 PSI)
-    data.pressureLng =
-        0.00128 * (float)adcData.pt2; // PT2 -> Lng Tank (500 PSI)
-    data.pressureInjectorLox =
-        0.00128 * (float)adcData.pt3; // PT3-> Lox Injector (500 PSI)
-    data.pressureInjectorLng =
-        0.00128 * (float)adcData.pt4; // PT4 -> Lng Injector (500 PSI)
+    data.pressureLox = 0.00128 * (float)adcData.pt1; // PT1 -> Lox Tank (500 PSI)
+    data.pressureLng = 0.00128 * (float)adcData.pt2; // PT2 -> Lng Tank (500 PSI)
+    data.pressureInjectorLox = 0.00128 * (float)adcData.pt3; // PT3-> Lox Injector (500 PSI)
+    data.pressureInjectorLng = 0.00128 * (float)adcData.pt4; // PT4 -> Lng Injector (500 PSI)
 
-    data.solenoidCurrentCopvVent =
-        0.000817f * (float)adcData.s0;                        // S0 -> COPV Vent
-    data.solenoidCurrentPv1 = 0.000817f * (float)adcData.s1;  // S1 -> PV1
-    data.solenoidCurrentPv2 = 0.000817f * (float)adcData.s2;  // S2 -> PV2
-    data.solenoidCurrentVent = 0.000817f * (float)adcData.s3; // S3 -> Tank Vent
+    // data.solenoidCurrentCopvVent =
+    //     0.000817f * (float)adcData.s0;                        // S0 -> COPV Vent
+    // data.solenoidCurrentPv1 = 0.000817f * (float)adcData.s1;  // S1 -> PV1
+    // data.solenoidCurrentPv2 = 0.000817f * (float)adcData.s2;  // S2 -> PV2
+    // data.solenoidCurrentVent = 0.000817f * (float)adcData.s3; // S3 -> Tank Vent
 
     // Read TCS
-    TcMax31855Spi::Data tcData;
-    tcData = tc0.Read();
-    if (tcData.valid) {
-      data.temperatureCopv = tcData.tcTemperature;
-    } else {
-      tcData = tc1.Read();
-      if (tcData.valid) {
-        data.temperatureCopv = tcData.tcTemperature;
-      }
-    }
+    // TcMax31855Spi::Data tcData;
+    // tcData = tc0.Read();
+    // if (tcData.valid) {
+    //   data.temperatureCopv = tcData.tcTemperature;
+    // } else {
+    //   tcData = tc1.Read();
+    //   if (tcData.valid) {
+    //     data.temperatureCopv = tcData.tcTemperature;
+    //   }
+    // }
 
     // Altimeter data
-    altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
-    if (altState == AltimeterMs5607Spi::State::COMPLETE) {
-        altData = altimeter.GetData();
-        data.temperature = altData.temperature;
-        data.altitude = altData.altitude;
-    }
+    // altState = altimeter.Read(AltimeterMs5607Spi::Rate::OSR4096);
+    // if (altState == AltimeterMs5607Spi::State::COMPLETE) {
+    //     altData = altimeter.GetData();
+    //     data.temperature = altData.temperature;
+    //     data.altitude = altData.altitude;
+    // }
 
     // IMU data
-    imuData = imu.Read();
-    data.angularVelocityX = -imuData.angularVelocityX;
-    data.angularVelocityY = imuData.angularVelocityY;
-    data.angularVelocityZ = -imuData.angularVelocityZ;
-    data.accelerationX = -imuData.accelerationX;
-    data.accelerationY = imuData.accelerationY;
-    data.accelerationZ = -imuData.accelerationZ;
+    // imuData = imu.Read();
+    // data.angularVelocityX = -imuData.angularVelocityX;
+    // data.angularVelocityY = imuData.angularVelocityY;
+    // data.angularVelocityZ = -imuData.angularVelocityZ;
+    // data.accelerationX = -imuData.accelerationX;
+    // data.accelerationY = imuData.accelerationY;
+    // data.accelerationZ = -imuData.accelerationZ;
 
     // Magnetometer data
-    magData = magnetometer.Read();
-    data.magneticFieldX = magData.magneticFieldY;
-    data.magneticFieldY = -magData.magneticFieldX;
-    data.magneticFieldZ = magData.magneticFieldZ;
+    // magData = magnetometer.Read();
+    // data.magneticFieldX = magData.magneticFieldY;
+    // data.magneticFieldY = -magData.magneticFieldX;
+    // data.magneticFieldZ = magData.magneticFieldZ;
 
     // GPS data 
     //bool gpsSuccess = gps.Poll(gpsData);
@@ -453,15 +449,15 @@ int main(void) {
     
     /* Radio */
     // first radio at 915 MHz
-    if (radio._state == RadioSx127xSpi::State::IDLE || 
-        radio._state == RadioSx127xSpi::State::TX_COMPLETE){
-        memcpy(memoryBuffer, &data, sizeof(data));
-        radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
-    }
-    else if (radio._state == RadioSx127xSpi::State::TX_START ||
-        radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
-        radio.Update();
-    }
+    // if (radio._state == RadioSx127xSpi::State::IDLE || 
+    //     radio._state == RadioSx127xSpi::State::TX_COMPLETE){
+    //     memcpy(memoryBuffer, &data, sizeof(data));
+    //     radio.Transmit(memoryBuffer, sizeof(memoryBuffer));
+    // }
+    // else if (radio._state == RadioSx127xSpi::State::TX_START ||
+    //     radio._state == RadioSx127xSpi::State::TX_IN_PROGRESS){
+    //     radio.Update();
+    // }
 
     // Write to memory
     // memcpy(memoryBuffer, &data, sizeof(memoryBuffer));
@@ -535,10 +531,14 @@ int main(void) {
     // ethernet
     uint32_t crc = Crc32((uint8_t *)&data, sizeof(EcuData) - 4);
     data.crc = crc;
-    HAL_StatusTypeDef stat =
-        HAL_UART_Transmit(&huart3, (uint8_t *)&data, sizeof(EcuData), 100);
+    HAL_StatusTypeDef stat = HAL_UART_Transmit(&huart3, (uint8_t *)&data, sizeof(EcuData), 100);
 
     // loop time control (the timestamp rolls over after 49 hours, should be ok)
+    /*
+    72 MHz = 72 * 10^6 / 36001 < recip = 500 us per tick
+
+    waits for 50 ms per cycle
+    */
     while ((TIM5->CNT << 16 | TIM4->CNT) - timestamp < 100) {
     }
   }
@@ -550,7 +550,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     gps.DMACompleteCallback();
   }
 
-  if (huart->Instance == USART3) {
+  /*if (huart->Instance == USART3) {
     // This is the command logic from main.cc
     uint32_t crc = Crc32(commandBuffer, sizeof(EcuCommand) - 4);
     if (crc == ((EcuCommand *)commandBuffer)->crc) {
@@ -559,12 +559,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     }
     // Re-arm the interrupt for huart3
     HAL_UART_Receive_IT(huart, commandBuffer, sizeof(EcuCommand));
-    /*
-    uint8_t dataTransmit[4] = {'r', 'e', 'z', 'q'};
-    HAL_UART_Transmit(&huart3, dataTransmit, sizeof(uint8_t) * 4, 2000);
-    HAL_UART_Receive_IT(&huart3, dataBuffer, 10);
-    */
-  }
+    
+  }*/
 }
 
 /**
@@ -572,42 +568,81 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
  * @retval None
  */
 void SystemClock_Config(void) {
+  // RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  // RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  // /** Configure the main internal regulator output voltage
+  //  */
+  // __HAL_RCC_PWR_CLK_ENABLE();
+  // __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+
+  // /** Initializes the RCC Oscillators according to the specified parameters
+  //  * in the RCC_OscInitTypeDef structure.
+  //  */
+  // RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  // RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
+  // RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  // RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  // RCC_OscInitStruct.PLL.PLLM = 8;
+  // RCC_OscInitStruct.PLL.PLLN = 168;
+  // RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  // RCC_OscInitStruct.PLL.PLLQ = 7;
+  // RCC_OscInitStruct.PLL.PLLR = 2;
+  // if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+  //   Error_Handler();
+  // }
+
+  // /** Initializes the CPU, AHB and APB buses clocks
+  //  */
+  // RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
+  //                               RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+  // RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  // RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  // RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  // RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+
+  // if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) {
+  //   Error_Handler();
+  // }
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-   */
+  */
   __HAL_RCC_PWR_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-   * in the RCC_OscInitTypeDef structure.
-   */
+  * in the RCC_OscInitTypeDef structure.
+  */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLN = 72;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 7;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   RCC_OscInitStruct.PLL.PLLR = 2;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
     Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
-                                RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
     Error_Handler();
   }
+
 }
 
 /**
@@ -1275,6 +1310,7 @@ static void MX_USART3_UART_Init(void) {
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
   huart3.Init.Mode = UART_MODE_TX_RX;
+//  huart3.Init.HwFlowCtl = UART_HWCONTROL_RTS_CTS;
   huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart3.Init.OverSampling = UART_OVERSAMPLING_16;
   if (HAL_UART_Init(&huart3) != HAL_OK) {
