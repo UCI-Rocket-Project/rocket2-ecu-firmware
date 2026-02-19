@@ -820,7 +820,7 @@ static void MX_ADC3_Init(void) {
   hadc3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc3.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc3.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc3.Init.NbrOfConversion = 7;
+  hadc3.Init.NbrOfConversion = 5;
   hadc3.Init.DMAContinuousRequests = DISABLE;
   hadc3.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc3) != HAL_OK) {
@@ -832,7 +832,7 @@ static void MX_ADC3_Init(void) {
    */
   sConfig.Channel = ADC_CHANNEL_8;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
     Error_Handler();
   }
@@ -873,23 +873,23 @@ static void MX_ADC3_Init(void) {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in
-   * the sequencer and its sample time.
-   */
-  sConfig.Channel = ADC_CHANNEL_2;
-  sConfig.Rank = 6;
-  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
-    Error_Handler();
-  }
+  // /** Configure for the selected ADC regular channel its corresponding rank in
+  //  * the sequencer and its sample time.
+  //  */
+  // sConfig.Channel = ADC_CHANNEL_2;
+  // sConfig.Rank = 6;
+  // if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
+  //   Error_Handler();
+  // }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in
-   * the sequencer and its sample time.
-   */
-  sConfig.Channel = ADC_CHANNEL_3;
-  sConfig.Rank = 7;
-  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
-    Error_Handler();
-  }
+  // /** Configure for the selected ADC regular channel its corresponding rank in
+  //  * the sequencer and its sample time.
+  //  */
+  // sConfig.Channel = ADC_CHANNEL_3;
+  // sConfig.Rank = 7;
+  // if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK) {
+  //   Error_Handler();
+  // }
   /* USER CODE BEGIN ADC3_Init 2 */
 
   /* USER CODE END ADC3_Init 2 */
