@@ -12,7 +12,6 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
-
 # Define the build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
@@ -28,8 +27,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
-# Enable CMake support for ASM and C languages
-enable_language(C ASM)
+#  Enable CMake support for ASM, C, and C++ (CXX) languages
+enable_language(C ASM CXX)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
@@ -42,19 +41,32 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
 )
 
+# A. Specific to REDs source files in RocketDrivers (one directory up)
+set(REDS_REQUIRED_DRIVERS
+    "../RocketDrivers/radio_sx127x_spi/radio_sx127x_spi.cc"
+)
+
+# B. Recursively find all directories that contain .h files (one directory up)
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    Core/Src/main.cpp
+    ${REDS_REQUIRED_DRIVERS}
 )
+
+file(GLOB_RECURSE ALL_DRIVER_HEADERS "../RocketDrivers/*.h")
+set(ALL_DRIVER_INC_DIRS "")
+foreach(_headerFile ${ALL_DRIVER_HEADERS})
+    get_filename_component(_dir ${_headerFile} DIRECTORY)
+    list(APPEND ALL_DRIVER_INC_DIRS ${_dir})
+endforeach()
+list(REMOVE_DUPLICATES ALL_DRIVER_INC_DIRS)
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
-)
-
-# Add project symbols (macros)
-target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined symbols
+    Core/Inc
+    ${ALL_DRIVER_INC_DIRS}
 )
 
 # Remove wrong libob.a library dependency when using cpp files
