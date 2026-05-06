@@ -3,9 +3,6 @@
 -.vscode/extensions.json
 .env/
 
-Core/
-CoreBak/
-Drivers/
 .settings
 
 build/
