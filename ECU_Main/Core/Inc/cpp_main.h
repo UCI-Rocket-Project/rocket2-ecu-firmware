@@ -1,29 +1,22 @@
 #ifndef CPP_MAIN_H // Prevents multiple inclusions of this header
 #define CPP_MAIN_H
 
+#include <stdint.h>
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" { // Disables C++ name mangling so C code can link to this
 #endif
 
-// Bridge from C startup code into your C++ application
+/**
+ * @brief Entry point for the C++ application
+ * This function initializes the C++ runtime and starts the main application loop.  
+ */
 void cpp_main(void);
 
 #ifdef __cplusplus
 } // Closes extern "C" block
 #endif
 
-#endif // CPP_MAIN_HP
-#ifndef INC_CPP_MAIN_H_
-#define INC_CPP_MAIN_H_
+#endif // CPP_MAIN_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void cpp_main(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* INC_CPP_MAIN_H_ */
